@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solo 视频生成工具</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="app-header">
+        <h1>Solo 视频生成工具</h1>
+        <nav class="tab-nav" id="tabNav">
+            <button class="tab-btn active" data-tab="creative">创意</button>
+            <button class="tab-btn" data-tab="script">剧本</button>
+            <button class="tab-btn" data-tab="storyboard">分镜</button>
+            <button class="tab-btn" data-tab="character">角色</button>
+            <button class="tab-btn" data-tab="image-gen">生图</button>
+            <button class="tab-btn" data-tab="video">视频</button>
+        </nav>
+    </header>
+
+    <main class="app-main">
+        <!-- 创意页面 -->
+        <section class="tab-panel active" id="panel-creative">
+            <div class="panel-content">
+                <div class="form-group">
+                    <label for="creativeInput">输入你的创意</label>
+                    <textarea id="creativeInput" placeholder="输入一首诗词、一个故事、一段意境描述..." rows="8"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>选择剧本生成方式</label>
+                    <div class="option-group" id="optionGroup">
+                        <label class="option-item">
+                            <input type="radio" name="scriptOption" value="1" checked>
+                            <span class="option-label">选项一：小故事（情感类）</span>
+                            <span class="option-desc">以人性为底层内核，改编成触达人心的微剧小故事</span>
+                        </label>
+                        <label class="option-item">
+                            <input type="radio" name="scriptOption" value="2">
+                            <span class="option-label">选项二：四联故事（情感类）</span>
+                            <span class="option-desc">选四首诗词，改编成高反差有网感的微剧小故事</span>
+                        </label>
+                        <label class="option-item">
+                            <input type="radio" name="scriptOption" value="3">
+                            <span class="option-label">选项三：穿梭机（风景类）</span>
+                            <span class="option-desc">无人机POV视角，构建宏大场景和行动轨迹</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>选择画幅比例</label>
+                    <div class="aspect-ratio-group" id="aspectRatioGroup">
+                        <label class="aspect-ratio-item active">
+                            <input type="radio" name="aspectRatio" value="16:9" checked>
+                            <span class="ratio-icon">▬</span>
+                            <span class="ratio-label">横板 16:9</span>
+                        </label>
+                        <label class="aspect-ratio-item">
+                            <input type="radio" name="aspectRatio" value="9:16">
+                            <span class="ratio-icon">▮</span>
+                            <span class="ratio-label">竖版 9:16</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="action-bar">
+                    <button class="btn btn-primary" id="btnSaveCreative">1. 保存创意</button>
+                    <button class="btn btn-success" id="btnGenerateScript">2. 保存创意并生成剧本</button>
+                </div>
+                <div class="project-info" id="projectInfo" style="display:none">
+                    <span class="project-id-label">当前项目：</span>
+                    <span id="currentProjectId"></span>
+                </div>
+                <div class="status-msg" id="creativeStatus"></div>
+
+                <div class="project-history">
+                    <div class="project-history-header">
+                        <h3>历史项目</h3>
+                        <button class="btn btn-small btn-new-project" id="btnNewProject">+ 新建项目</button>
+                    </div>
+                    <div class="project-list" id="projectList">
+                        <p class="empty-hint">暂无历史项目</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 剧本页面 -->
+        <section class="tab-panel" id="panel-script">
+            <div class="panel-content">
+                <div class="action-bar">
+                    <button class="btn btn-success" id="btnRegenerateScript">3. 重新生成剧本</button>
+                    <button class="btn btn-primary" id="btnSaveScript">4. 保存剧本</button>
+                    <button class="btn btn-accent" id="btnGenerateStoryboard">5. 生成分镜</button>
+                    <span class="aspect-ratio-badge" id="scriptAspectBadge" style="display:none">画幅: 16:9</span>
+                </div>
+                <div class="editor-container">
+                    <textarea id="scriptEditor" placeholder="剧本内容将在此显示..." rows="20"></textarea>
+                </div>
+                <div class="status-msg" id="scriptStatus"></div>
+            </div>
+        </section>
+
+        <!-- 分镜页面 -->
+        <section class="tab-panel" id="panel-storyboard">
+            <div class="panel-content">
+                <div class="action-bar">
+                    <button class="btn btn-success" id="btnRegenerateStoryboard">6. 重新生成分镜</button>
+                    <button class="btn btn-primary" id="btnSaveStoryboard">7. 保存分镜</button>
+                </div>
+                <div class="storyboard-list" id="storyboardList">
+                    <p class="empty-hint">暂无分镜数据，请先生成分镜</p>
+                </div>
+                <div class="status-msg" id="storyboardStatus"></div>
+            </div>
+        </section>
+
+        <!-- 角色页面 -->
+        <section class="tab-panel" id="panel-character">
+            <div class="panel-content">
+                <div class="action-bar">
+                    <button class="btn btn-success" id="btnExtractCharacters">8. 提取角色</button>
+                    <button class="btn btn-accent" id="btnGenerateCharImgs">9. 生成角色图</button>
+                </div>
+                <div class="character-list" id="characterList">
+                    <p class="empty-hint">暂无角色数据，请先提取角色</p>
+                </div>
+                <div class="status-msg" id="characterStatus"></div>
+            </div>
+        </section>
+
+        <!-- 生图页面 -->
+        <section class="tab-panel" id="panel-image-gen">
+            <div class="panel-content">
+                <div class="action-bar">
+                    <button class="btn btn-accent" id="btnGenerateImgPrompts">10. 生成首帧图提示词</button>
+                    <button class="btn btn-accent" id="btnGenerateImgs">11. 生成首帧图</button>
+                    <button class="btn btn-accent" id="btnGenerateVideos">12. 生成视频</button>
+                </div>
+                <div class="storyboard-list" id="imageGenList">
+                    <p class="empty-hint">暂无分镜数据，请先生成分镜</p>
+                </div>
+                <div class="status-msg" id="imageGenStatus"></div>
+            </div>
+        </section>
+
+        <!-- 视频页面 -->
+        <section class="tab-panel" id="panel-video">
+            <div class="panel-content">
+                <div class="action-bar">
+                    <button class="btn btn-primary" id="btnRefreshVideos">13. 刷新视频列表</button>
+                </div>
+                <div class="video-list" id="videoList">
+                    <p class="empty-hint">暂无视频数据，请先生成视频</p>
+                </div>
+                <div class="status-msg" id="videoStatus"></div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="app-footer">
+        <span>Solo 视频生成工具 v1.0</span>
+    </footer>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">处理中...</div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
