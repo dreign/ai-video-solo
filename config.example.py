@@ -1,13 +1,13 @@
-"""配置文件 - 存放 API 密钥等配置"""
+"""配置文件示例 - 复制为 config.py 并填入实际密钥"""
 import os
 
 # DeepSeek API 配置
-DEEPSEEK_API_KEY = "sk-f553a65fbdd64652b4de3783b2833025"
+DEEPSEEK_API_KEY = "your-deepseek-api-key"
 DEEPSEEK_API_BASE = "https://api.deepseek.com/v1"
 DEEPSEEK_MODEL = "deepseek-chat"
 
 # 火山引擎 Ark API 配置（doubao-seedream 图片生成）
-ARK_API_KEY = "f95e0a82-5e68-4b13-a196-053aeba3c221"
+ARK_API_KEY = "your-ark-api-key"
 ARK_IMAGE_MODEL = "doubao-seedream-4-5-251128"
 ARK_IMAGE_ENDPOINT = "https://ark.cn-beijing.volces.com/api/v3/images/generations"
 
