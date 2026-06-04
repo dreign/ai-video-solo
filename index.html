@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Solo 视频生成工具</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <header class="app-header">
@@ -16,6 +17,7 @@
             <button class="tab-btn" data-tab="character">角色</button>
             <button class="tab-btn" data-tab="image-gen">生图</button>
             <button class="tab-btn" data-tab="video">视频</button>
+            <button class="tab-btn tab-btn-settings" data-tab="settings">设置</button>
         </nav>
     </header>
 
@@ -91,10 +93,12 @@
                     <button class="btn btn-success" id="btnRegenerateScript">3. 重新生成剧本</button>
                     <button class="btn btn-primary" id="btnSaveScript">4. 保存剧本</button>
                     <button class="btn btn-accent" id="btnGenerateStoryboard">5. 生成分镜</button>
+                    <button class="btn btn-toggle" id="btnTogglePreview">预览</button>
                     <span class="aspect-ratio-badge" id="scriptAspectBadge" style="display:none">画幅: 16:9</span>
                 </div>
                 <div class="editor-container">
                     <textarea id="scriptEditor" placeholder="剧本内容将在此显示..." rows="20"></textarea>
+                    <div class="markdown-preview" id="scriptPreview" style="display:none"></div>
                 </div>
                 <div class="status-msg" id="scriptStatus"></div>
             </div>
@@ -145,14 +149,198 @@
 
         <!-- 视频页面 -->
         <section class="tab-panel" id="panel-video">
-            <div class="panel-content">
+            <div class="panel-content video-panel">
                 <div class="action-bar">
                     <button class="btn btn-primary" id="btnRefreshVideos">13. 刷新视频列表</button>
                 </div>
-                <div class="video-list" id="videoList">
-                    <p class="empty-hint">暂无视频数据，请先生成视频</p>
+
+                <!-- 主播放器区域 -->
+                <div class="main-player-container">
+                    <video id="mainPlayer" controls></video>
+                    <div class="player-overlay" id="playerOverlay">
+                        <button class="play-all-btn" id="btnPlayAll">
+                            <span class="play-icon">▶</span>
+                            <span>播放全部</span>
+                        </button>
+                    </div>
                 </div>
+
+                <!-- 播放信息 -->
+                <div class="playback-info" id="playbackInfo">
+                    <span class="current-scene" id="currentScene">未选择</span>
+                    <span class="playback-progress" id="playbackProgress">0 / 0</span>
+                </div>
+
+                <!-- 分镜缩略图横轴 -->
+                <div class="storyboard-timeline-container">
+                    <div class="storyboard-timeline" id="storyboardTimeline">
+                        <p class="empty-hint">暂无视频数据，请先生成视频</p>
+                    </div>
+                </div>
+
                 <div class="status-msg" id="videoStatus"></div>
+            </div>
+        </section>
+
+        <!-- 设置页面 -->
+        <section class="tab-panel" id="panel-settings">
+            <div class="panel-content">
+                <!-- ===== 文本处理 ===== -->
+                <div class="settings-section">
+                    <h2 class="settings-title">文本处理（LLM）</h2>
+
+                    <!-- 引擎选择 -->
+                    <div class="form-group">
+                        <label>处理引擎</label>
+                        <div class="engine-toggle" id="textEngineToggle">
+                            <label class="engine-option active" data-engine="deepseek">
+                                <input type="radio" name="textEngine" value="deepseek" checked>
+                                <span class="engine-label">DeepSeek 官方</span>
+                            </label>
+                            <label class="engine-option" data-engine="ark">
+                                <input type="radio" name="textEngine" value="ark">
+                                <span class="engine-label">豆包 Ark</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- DeepSeek 官方配置 -->
+                    <div class="engine-fields" data-engine="deepseek">
+                        <div class="form-group">
+                            <label for="settingsDeepseekKey">API Key</label>
+                            <input type="password" id="settingsDeepseekKey" placeholder="sk-...">
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsDeepseekBase">API 地址</label>
+                            <input type="text" id="settingsDeepseekBase" placeholder="https://api.deepseek.com/v1">
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsDeepseekModel">模型</label>
+                            <input type="text" id="settingsDeepseekModel" placeholder="deepseek-chat">
+                        </div>
+                    </div>
+
+                    <!-- 豆包 Ark DeepSeek 配置 -->
+                    <div class="engine-fields" data-engine="ark" style="display:none">
+                        <div class="form-group">
+                            <label for="settingsArkTextModel">模型</label>
+                            <input type="text" id="settingsArkTextModel" placeholder="deepseek-v4-flash-260425" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsArkTextEndpoint">API 端点</label>
+                            <input type="text" id="settingsArkTextEndpoint" placeholder="https://ark.cn-beijing.volces.com/api/v3/responses">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== 图片处理 ===== -->
+                <div class="settings-section">
+                    <h2 class="settings-title">图片处理</h2>
+
+                    <!-- 引擎选择 -->
+                    <div class="form-group">
+                        <label>处理引擎</label>
+                        <div class="engine-toggle" id="imageEngineToggle">
+                            <label class="engine-option active" data-engine="doubao">
+                                <input type="radio" name="imageEngine" value="doubao" checked>
+                                <span class="engine-label">豆包 Seedream</span>
+                            </label>
+                            <label class="engine-option" data-engine="comfyui">
+                                <input type="radio" name="imageEngine" value="comfyui">
+                                <span class="engine-label">ComfyUI Z-Image-Turbo</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 豆包配置（引擎为 doubao 时显示） -->
+                    <div class="engine-fields" data-engine="doubao">
+                        <div class="form-group">
+                            <label for="settingsArkKey">Ark API Key</label>
+                            <input type="password" id="settingsArkKey" placeholder="...">
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsArkImageModel">模型</label>
+                            <select id="settingsArkImageModel" class="settings-select">
+                                <option value="doubao-seedream-4-5-251128">doubao-seedream-4-5-251128</option>
+                                <option value="doubao-seedream-5-0-260128">doubao-seedream-5-0-260128</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsArkImageEndpoint">API 端点</label>
+                            <input type="text" id="settingsArkImageEndpoint" placeholder="https://ark.cn-beijing.volces.com/api/v3/images/generations">
+                        </div>
+                    </div>
+
+                    <!-- ComfyUI 配置（引擎为 comfyui 时显示） -->
+                    <div class="engine-fields" data-engine="comfyui" style="display:none">
+                        <div class="form-group">
+                            <label for="settingsComfyHost">ComfyUI 服务地址</label>
+                            <input type="text" id="settingsComfyHost" placeholder="http://127.0.0.1:8000">
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsComfyOutputDir">ComfyUI 输出目录</label>
+                            <input type="text" id="settingsComfyOutputDir" placeholder="C:\Users\...\ComfyUI\output">
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsComfyImageWorkflow">文生图工作流文件</label>
+                            <input type="text" id="settingsComfyImageWorkflow" placeholder="image_z_image_turbo_api.json">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== 视频处理 ===== -->
+                <div class="settings-section">
+                    <h2 class="settings-title">视频处理</h2>
+
+                    <!-- 引擎选择 -->
+                    <div class="form-group">
+                        <label>处理引擎</label>
+                        <div class="engine-toggle" id="videoEngineToggle">
+                            <label class="engine-option active" data-engine="comfyui">
+                                <input type="radio" name="videoEngine" value="comfyui" checked>
+                                <span class="engine-label">ComfyUI LTX I2V</span>
+                            </label>
+                            <label class="engine-option" data-engine="doubao">
+                                <input type="radio" name="videoEngine" value="doubao">
+                                <span class="engine-label">豆包 Seedance</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- ComfyUI 配置（引擎为 comfyui 时显示） -->
+                    <div class="engine-fields" data-engine="comfyui">
+                        <div class="form-group">
+                            <label for="settingsVideoComfyHost">ComfyUI 服务地址</label>
+                            <input type="text" id="settingsVideoComfyHost" placeholder="http://127.0.0.1:8000">
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsVideoComfyOutputDir">ComfyUI 输出目录</label>
+                            <input type="text" id="settingsVideoComfyOutputDir" placeholder="C:\Users\...\ComfyUI\output">
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsComfyVideoWorkflow">图生视频工作流文件</label>
+                            <input type="text" id="settingsComfyVideoWorkflow" placeholder="video_ltx2_3_i2v_api.json">
+                        </div>
+                    </div>
+
+                    <!-- 豆包配置（引擎为 doubao 时显示，隐藏） -->
+                    <div class="engine-fields" data-engine="doubao" style="display:none">
+                        <div class="form-group">
+                            <label for="settingsArkVideoModel">模型</label>
+                            <input type="text" id="settingsArkVideoModel" placeholder="doubao-seedance-2-0-fast-260128" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsArkVideoEndpoint">API 端点</label>
+                            <input type="text" id="settingsArkVideoEndpoint" placeholder="https://ark.cn-beijing.volces.com/api/v3/video/generations">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-bar">
+                    <button class="btn btn-success" id="btnSaveSettings">保存设置</button>
+                    <button class="btn btn-primary" id="btnTestConnection">测试连接</button>
+                </div>
+                <div class="status-msg" id="settingsStatus"></div>
             </div>
         </section>
     </main>

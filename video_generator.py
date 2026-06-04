@@ -5,7 +5,7 @@ import shutil
 import time
 from pathlib import Path
 import requests
-from config import COMFYUI_HOST, COMFYUI_OUTPUT_DIR, VIDEO_WORKFLOW_PATH
+from config import COMFYUI_HOST, COMFYUI_OUTPUT_DIR, VIDEO_WORKFLOW_PATH, IMAGE_Z_IMAGE_TURBO_WORKFLOW_PATH
 from logger import log_step, log_video_gen, log_api_call, log_api_full_io, log_error, log_debug, log_warn, log_info
 
 
@@ -221,3 +221,94 @@ def generate_video(
 
     log_error("ComfyUI", "未找到生成的视频文件")
     raise Exception("未找到生成的视频文件")
+
+
+# ============ Z-Image-Turbo 文生图 ============
+
+def modify_z_image_workflow(workflow: dict, prompt: str, width: int, height: int, output_prefix: str) -> dict:
+    """修改 Z-Image-Turbo 文生图工作流参数"""
+    log_debug(f"修改 Z-Image 工作流: {width}x{height}, prefix={output_prefix}")
+
+    import random as _random
+    modified = json.loads(json.dumps(workflow))
+
+    changes = []
+
+    # 设置正面提示词 (CLIPTextEncode)
+    if "57:27" in modified and modified["57:27"].get("class_type") == "CLIPTextEncode":
+        modified["57:27"]["inputs"]["text"] = prompt
+        changes.append(f"PositivePrompt: length={len(prompt)}")
+
+    # 设置图片尺寸 (EmptySD3LatentImage)
+    if "57:13" in modified and modified["57:13"].get("class_type") == "EmptySD3LatentImage":
+        modified["57:13"]["inputs"]["width"] = width
+        modified["57:13"]["inputs"]["height"] = height
+        changes.append(f"Size: {width}x{height}")
+
+    # 设置随机种子 (KSampler)
+    if "57:3" in modified and modified["57:3"].get("class_type") == "KSampler":
+        # 使用随机种子增加多样性
+        modified["57:3"]["inputs"]["seed"] = _random.randint(0, 2**64 - 1)
+        changes.append("Seed: randomized")
+
+    # 设置输出前缀 (SaveImage)
+    if "9" in modified and modified["9"].get("class_type") == "SaveImage":
+        modified["9"]["inputs"]["filename_prefix"] = output_prefix
+        changes.append(f"SaveImage prefix: '{output_prefix}'")
+
+    log_debug(f"Z-Image 工作流修改完成: {', '.join(changes)}")
+    return modified
+
+
+def generate_image_via_comfyui(
+    prompt: str,
+    aspect_ratio: str,
+    output_dir: str,
+    scene_id: str,
+) -> str:
+    """
+    通过 ComfyUI Z-Image-Turbo 生成图片
+
+    Args:
+        prompt: 图片提示词
+        aspect_ratio: 画幅比例 "16:9" 或 "9:16"
+        output_dir: 输出目录
+        scene_id: 分镜ID
+
+    Returns:
+        生成的图片文件路径
+    """
+    t0 = time.time()
+    log_step("Z-Image 文生图", "开始", f"scene_id={scene_id} | aspect={aspect_ratio} | prompt_len={len(prompt)}")
+
+    # 根据画幅比例计算尺寸
+    if aspect_ratio == "9:16":
+        width, height = 1080, 1920
+    else:
+        width, height = 1920, 1080
+
+    # 加载并修改工作流
+    workflow = load_workflow(IMAGE_Z_IMAGE_TURBO_WORKFLOW_PATH)
+    output_prefix = f"solo_img_{scene_id}"
+    modified_workflow = modify_z_image_workflow(workflow, prompt, width, height, output_prefix)
+
+    # 提交任务
+    prompt_id = queue_prompt(modified_workflow)
+    log_info(f"Z-Image 工作流已提交, scene_id={scene_id}, prompt_id={prompt_id}")
+
+    # 等待完成
+    wait_for_completion(prompt_id)
+
+    # 获取输出
+    latest_img = get_latest_output([".png", ".jpg", ".jpeg", ".webp"])
+    if latest_img:
+        os.makedirs(output_dir, exist_ok=True)
+        dest_path = os.path.join(output_dir, f"scene_{scene_id}.png")
+        shutil.copy2(latest_img, dest_path)
+        elapsed = time.time() - t0
+        file_size = os.path.getsize(dest_path)
+        log_step("Z-Image 文生图", "完成", f"scene_id={scene_id} | output={dest_path} | size={file_size}bytes | elapsed={elapsed:.1f}s")
+        return dest_path
+
+    log_error("ComfyUI", "未找到生成的图片文件")
+    raise Exception("未找到生成的图片文件")

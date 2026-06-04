@@ -4,9 +4,11 @@ import logging
 import os
 import sys
 from datetime import datetime
+from logging.handlers import TimedRotatingFileHandler
 from config import SOLO_DIR
 
-LOG_FILE = os.path.join(SOLO_DIR, "app.log")
+LOG_DIR = os.path.join(SOLO_DIR, "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
 
 # 根 logger 配置
 logger = logging.getLogger("solo")
@@ -22,8 +24,15 @@ console_fmt = logging.Formatter(
 console_handler.setFormatter(console_fmt)
 logger.addHandler(console_handler)
 
-# 文件 handler
-file_handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
+# 按日期轮转的文件 handler（每天一个文件，保留30天）
+log_file_pattern = os.path.join(LOG_DIR, "app.log")
+file_handler = TimedRotatingFileHandler(
+    log_file_pattern,
+    when="midnight",
+    interval=1,
+    backupCount=30,
+    encoding="utf-8",
+)
 file_handler.setLevel(logging.DEBUG)
 file_fmt = logging.Formatter(
     "[%(asctime)s] [%(levelname)-5s] [%(name)s] %(message)s",

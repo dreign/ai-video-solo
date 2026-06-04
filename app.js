@@ -150,6 +150,9 @@ async function loadTabData(tabName) {
         case "video":
             await loadVideoData();
             break;
+        case "settings":
+            await loadSettingsData();
+            break;
     }
 }
 
@@ -372,6 +375,8 @@ async function loadScriptData() {
         if (data.script) {
             document.getElementById("scriptEditor").value = data.script;
         }
+        // 加载剧本时默认切换到预览模式
+        activatePreviewMode();
     } catch (e) {
         console.error("加载剧本数据失败:", e);
     }
@@ -449,6 +454,57 @@ document.getElementById("btnGenerateStoryboard").addEventListener("click", async
         setTimeout(() => switchTab("storyboard"), 1000);
     } else {
         showStatus("scriptStatus", result.error || "分镜生成失败", "error");
+    }
+});
+
+// ============ 剧本 Markdown 预览切换 ============
+let isPreviewMode = false;
+
+function resetPreviewMode() {
+    if (!isPreviewMode) return;
+    isPreviewMode = false;
+    document.getElementById('scriptEditor').style.display = 'block';
+    document.getElementById('scriptPreview').style.display = 'none';
+    const btn = document.getElementById('btnTogglePreview');
+    btn.textContent = '预览';
+    btn.classList.remove('active');
+}
+
+function activatePreviewMode() {
+    const editor = document.getElementById('scriptEditor');
+    const preview = document.getElementById('scriptPreview');
+    const btn = document.getElementById('btnTogglePreview');
+    if (!editor.value) {
+        resetPreviewMode();
+        return;
+    }
+    isPreviewMode = true;
+    preview.innerHTML = marked.parse(editor.value);
+    editor.style.display = 'none';
+    preview.style.display = 'block';
+    btn.textContent = '编辑';
+    btn.classList.add('active');
+}
+
+document.getElementById('btnTogglePreview').addEventListener('click', () => {
+    const editor = document.getElementById('scriptEditor');
+    const preview = document.getElementById('scriptPreview');
+    const btn = document.getElementById('btnTogglePreview');
+
+    isPreviewMode = !isPreviewMode;
+
+    if (isPreviewMode) {
+        const md = editor.value;
+        preview.innerHTML = marked.parse(md || '_（暂无剧本内容）_');
+        editor.style.display = 'none';
+        preview.style.display = 'block';
+        btn.textContent = '编辑';
+        btn.classList.add('active');
+    } else {
+        editor.style.display = 'block';
+        preview.style.display = 'none';
+        btn.textContent = '预览';
+        btn.classList.remove('active');
     }
 });
 
@@ -665,7 +721,7 @@ function renderCharacterList(characters) {
             </div>
             <div class="char-prompt">${char.prompt || "无提示词"}</div>
             ${char.img
-                ? `<img class="char-img" src="${char.img}?t=${Date.now()}" alt="${char.name_cn}">`
+                ? `<img class="char-img" src="${char.img}?t=${Date.now()}" alt="${char.name_cn}" onmouseenter="showImagePreview(this.src)" onmouseleave="hideImagePreview()">`
                 : '<div class="char-img-placeholder">角色图未生成</div>'}
         </div>`;
     });
@@ -706,42 +762,467 @@ document.getElementById("btnGenerateCharImgs").addEventListener("click", async (
 });
 
 // ============ 视频页面 ============
-function renderVideoList(videos) {
-    const container = document.getElementById("videoList");
-    if (!videos || videos.length === 0) {
+let currentVideos = [];
+let currentVideoIndex = -1;
+let isPlayingAll = false;
+
+// 渲染分镜时间轴
+function renderStoryboardTimeline(storyboard) {
+    const container = document.getElementById("storyboardTimeline");
+    if (!storyboard || storyboard.length === 0) {
         container.innerHTML = '<p class="empty-hint">暂无视频数据，请先生成视频</p>';
         return;
     }
 
     let html = "";
-    videos.forEach((v) => {
+    storyboard.forEach((scene, index) => {
+        const hasVideo = scene.video && scene.video.trim() !== "";
         html += `
-        <div class="video-card">
-            <video src="${v.video}?t=${Date.now()}" controls></video>
-            <div class="video-info">
-                <div class="video-scene-id">${v.scene_id}</div>
-                <div class="video-desc">${v.desc || ""}</div>
-                <div class="video-duration">${v.duration || 0}秒</div>
+        <div class="timeline-item ${hasVideo ? '' : 'no-video'}" data-index="${index}" data-scene-id="${scene.scene_id}">
+            <div class="timeline-thumb">
+                ${hasVideo
+                    ? `<video src="${scene.video}" muted preload="metadata"></video>`
+                    : `<div class="no-video">无视频</div>`
+                }
+            </div>
+            <div class="timeline-info">
+                <div class="timeline-scene-id">${scene.scene_id}</div>
+                <div class="timeline-duration">${scene.duration || 0}秒</div>
             </div>
         </div>`;
     });
     container.innerHTML = html;
+
+    // 绑定点击事件
+    container.querySelectorAll('.timeline-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const index = parseInt(item.dataset.index);
+            playVideoAtIndex(index);
+        });
+    });
+
+    // 绑定鼠标悬停预览事件
+    container.querySelectorAll('.timeline-item').forEach(item => {
+        const index = parseInt(item.dataset.index);
+        const scene = storyboard[index];
+
+        item.addEventListener('mouseenter', (e) => {
+            if (scene.img_start || scene.img_end) {
+                showTimelinePreview(scene, e.target);
+            }
+        });
+
+        item.addEventListener('mouseleave', () => {
+            hideTimelinePreview();
+        });
+    });
 }
 
+// 播放指定索引的视频
+function playVideoAtIndex(index) {
+    if (!currentVideos || index < 0 || index >= currentVideos.length) return;
+
+    const video = currentVideos[index];
+    if (!video.video) {
+        showStatus("videoStatus", "该分镜暂无视频", "error");
+        return;
+    }
+
+    currentVideoIndex = index;
+    const mainPlayer = document.getElementById("mainPlayer");
+    const overlay = document.getElementById("playerOverlay");
+
+    mainPlayer.src = video.video;
+    mainPlayer.play();
+
+    // 隐藏遮罩
+    overlay.classList.add('hidden');
+
+    // 更新时间轴高亮
+    updateTimelineHighlight();
+
+    // 更新播放信息
+    updatePlaybackInfo();
+}
+
+// 更新时间轴高亮
+function updateTimelineHighlight() {
+    const items = document.querySelectorAll('.timeline-item');
+    items.forEach((item, index) => {
+        item.classList.remove('active', 'played');
+        if (index === currentVideoIndex) {
+            item.classList.add('active');
+            // 滚动到可视区域
+            item.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        } else if (index < currentVideoIndex) {
+            item.classList.add('played');
+        }
+    });
+}
+
+// 更新播放信息
+function updatePlaybackInfo() {
+    const currentSceneEl = document.getElementById("currentScene");
+    const progressEl = document.getElementById("playbackProgress");
+
+    if (currentVideoIndex >= 0 && currentVideos[currentVideoIndex]) {
+        const scene = currentVideos[currentVideoIndex];
+        currentSceneEl.textContent = `${scene.scene_id} - ${scene.desc || ''}`.slice(0, 40);
+    } else {
+        currentSceneEl.textContent = '未选择';
+    }
+
+    progressEl.textContent = `${currentVideoIndex + 1} / ${currentVideos.length}`;
+}
+
+// 播放下一个视频
+function playNextVideo() {
+    if (!isPlayingAll) return;
+
+    const nextIndex = currentVideoIndex + 1;
+    if (nextIndex < currentVideos.length) {
+        // 跳过没有视频的分镜
+        if (currentVideos[nextIndex].video) {
+            playVideoAtIndex(nextIndex);
+        } else {
+            currentVideoIndex = nextIndex;
+            playNextVideo();
+        }
+    } else {
+        // 播放完毕
+        isPlayingAll = false;
+        document.getElementById("playerOverlay").classList.remove('hidden');
+        showStatus("videoStatus", "全部播放完毕", "success");
+    }
+}
+
+// 加载视频数据
 async function loadVideoData() {
     try {
-        const data = await apiFetch("/api/video/list");
-        data.videos = await convertStoryboardMediaUrls(data.videos);
-        renderVideoList(data.videos);
+        const data = await apiFetch("/api/storyboard/load");
+        currentVideos = await convertStoryboardMediaUrls(data.storyboard || []);
+        renderStoryboardTimeline(currentVideos);
+
+        // 重置播放器
+        const mainPlayer = document.getElementById("mainPlayer");
+        mainPlayer.src = "";
+        currentVideoIndex = -1;
+        isPlayingAll = false;
+        document.getElementById("playerOverlay").classList.remove('hidden');
+        updatePlaybackInfo();
     } catch (e) {
         console.error("加载视频数据失败:", e);
     }
 }
 
+// 刷新按钮
 document.getElementById("btnRefreshVideos").addEventListener("click", () => {
     loadVideoData();
     showStatus("videoStatus", "视频列表已刷新", "success");
 });
+
+// 播放全部按钮
+document.getElementById("btnPlayAll").addEventListener("click", () => {
+    if (!currentVideos || currentVideos.length === 0) {
+        showStatus("videoStatus", "暂无视频可播放", "error");
+        return;
+    }
+
+    // 找到第一个有视频的分镜
+    const firstVideoIndex = currentVideos.findIndex(v => v.video);
+    if (firstVideoIndex === -1) {
+        showStatus("videoStatus", "没有可播放的视频", "error");
+        return;
+    }
+
+    isPlayingAll = true;
+    playVideoAtIndex(firstVideoIndex);
+});
+
+// 主播放器事件监听
+document.addEventListener("DOMContentLoaded", () => {
+    const mainPlayer = document.getElementById("mainPlayer");
+
+    mainPlayer.addEventListener('ended', () => {
+        if (isPlayingAll) {
+            playNextVideo();
+        }
+    });
+
+    mainPlayer.addEventListener('error', () => {
+        if (isPlayingAll) {
+            // 出错时继续播放下一个
+            playNextVideo();
+        }
+    });
+});
+
+// 保留旧函数兼容
+function renderVideoList(videos) {
+    currentVideos = videos || [];
+    renderStoryboardTimeline(currentVideos);
+}
+
+// ============ 分镜缩略图预览浮层 ============
+function showTimelinePreview(scene, targetEl) {
+    // 移除已存在的预览浮层
+    hideTimelinePreview();
+
+    // 创建预览浮层
+    const preview = document.createElement('div');
+    preview.id = 'timelinePreview';
+    preview.className = 'timeline-preview';
+
+    // 优先显示首帧图，如果没有则显示尾帧图
+    const imgUrl = scene.img_start || scene.img_end;
+
+    preview.innerHTML = `
+        <div class="preview-content">
+            <img src="${imgUrl}?t=${Date.now()}" alt="${scene.scene_id}">
+            <div class="preview-info">
+                <div class="preview-scene-id">${scene.scene_id}</div>
+                <div class="preview-desc">${scene.desc || ''}</div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(preview);
+
+    // 计算位置 - 显示在目标元素上方
+    const rect = targetEl.getBoundingClientRect();
+    const previewWidth = 400;
+    const previewHeight = 280;
+
+    let left = rect.left + (rect.width / 2) - (previewWidth / 2);
+    let top = rect.top - previewHeight - 10;
+
+    // 边界检查
+    if (left < 10) left = 10;
+    if (left + previewWidth > window.innerWidth - 10) {
+        left = window.innerWidth - previewWidth - 10;
+    }
+    if (top < 10) {
+        // 如果上方空间不足，显示在下方
+        top = rect.bottom + 10;
+    }
+
+    preview.style.left = `${left}px`;
+    preview.style.top = `${top}px`;
+
+    // 添加显示动画
+    requestAnimationFrame(() => {
+        preview.classList.add('show');
+    });
+}
+
+function hideTimelinePreview() {
+    const preview = document.getElementById('timelinePreview');
+    if (preview) {
+        preview.remove();
+    }
+}
+
+// ============ 图片预览 ============
+function showImagePreview(src) {
+    let preview = document.getElementById("imagePreview");
+    if (!preview) {
+        preview = document.createElement("div");
+        preview.id = "imagePreview";
+        preview.className = "image-preview";
+        preview.innerHTML = '<img src="" alt="预览">';
+        document.body.appendChild(preview);
+    }
+    preview.querySelector("img").src = src;
+    preview.classList.add("show");
+}
+
+function hideImagePreview() {
+    const preview = document.getElementById("imagePreview");
+    if (preview) {
+        preview.classList.remove("show");
+    }
+}
+
+// ============ 设置页面 ============
+
+// ---- 引擎切换逻辑 ----
+function initEngineToggles() {
+    document.querySelectorAll('.engine-toggle').forEach(toggle => {
+        toggle.addEventListener('change', (e) => {
+            const radio = e.target;
+            if (radio.type !== 'radio') return;
+            const engine = radio.value;
+            const container = toggle.closest('.settings-section');
+
+            // 更新 toggle 按钮 active 状态
+            toggle.querySelectorAll('.engine-option').forEach(opt => {
+                opt.classList.toggle('active', opt.dataset.engine === engine);
+            });
+
+            // 切换引擎字段显示
+            container.querySelectorAll('.engine-fields').forEach(fields => {
+                fields.style.display = fields.dataset.engine === engine ? 'block' : 'none';
+            });
+        });
+    });
+}
+
+async function loadSettingsData() {
+    try {
+        const data = await apiFetch("/api/settings/load");
+        if (!data.settings) return;
+        const s = data.settings;
+
+        // 文本处理 - 引擎
+        const txtEngine = s.text_engine || "deepseek";
+        const txtRadio = document.querySelector('input[name="textEngine"][value="' + txtEngine + '"]');
+        if (txtRadio) txtRadio.checked = true;
+        const txtToggle = document.getElementById("textEngineToggle");
+        const txtSection = txtToggle.closest('.settings-section');
+        txtToggle.querySelectorAll('.engine-option').forEach(opt => {
+            opt.classList.toggle('active', opt.dataset.engine === txtEngine);
+        });
+        txtSection.querySelectorAll('.engine-fields').forEach(fields => {
+            fields.style.display = fields.dataset.engine === txtEngine ? 'block' : 'none';
+        });
+
+        // 文本处理 - 字段
+        document.getElementById("settingsDeepseekKey").value = s.deepseek_api_key || "";
+        document.getElementById("settingsDeepseekBase").value = s.deepseek_api_base || "";
+        document.getElementById("settingsDeepseekModel").value = s.deepseek_model || "";
+        document.getElementById("settingsArkTextModel").value = s.ark_text_model || "deepseek-v4-flash-260425";
+        document.getElementById("settingsArkTextEndpoint").value = s.ark_text_endpoint || "";
+
+        // 图片处理 - 引擎
+        const imgEngine = s.image_engine || "doubao";
+        const imgRadio = document.querySelector('input[name="imageEngine"][value="' + imgEngine + '"]');
+        if (imgRadio) imgRadio.checked = true;
+        // 触发切换显示
+        const imgToggle = document.getElementById("imageEngineToggle");
+        const imgSection = imgToggle.closest('.settings-section');
+        imgToggle.querySelectorAll('.engine-option').forEach(opt => {
+            opt.classList.toggle('active', opt.dataset.engine === imgEngine);
+        });
+        imgSection.querySelectorAll('.engine-fields').forEach(fields => {
+            fields.style.display = fields.dataset.engine === imgEngine ? 'block' : 'none';
+        });
+
+        // 图片处理 - 字段
+        document.getElementById("settingsArkKey").value = s.ark_api_key || "";
+        document.getElementById("settingsArkImageModel").value = s.ark_image_model || "doubao-seedream-4-5-251128";
+        document.getElementById("settingsArkImageEndpoint").value = s.ark_image_endpoint || "";
+        document.getElementById("settingsComfyHost").value = s.comfyui_host || "";
+        document.getElementById("settingsComfyOutputDir").value = s.comfyui_output_dir || "";
+        document.getElementById("settingsComfyImageWorkflow").value = s.comfyui_image_workflow || "";
+
+        // 视频处理 - 引擎
+        const vidEngine = s.video_engine || "comfyui";
+        const vidRadio = document.querySelector('input[name="videoEngine"][value="' + vidEngine + '"]');
+        if (vidRadio) vidRadio.checked = true;
+        const vidToggle = document.getElementById("videoEngineToggle");
+        const vidSection = vidToggle.closest('.settings-section');
+        vidToggle.querySelectorAll('.engine-option').forEach(opt => {
+            opt.classList.toggle('active', opt.dataset.engine === vidEngine);
+        });
+        vidSection.querySelectorAll('.engine-fields').forEach(fields => {
+            fields.style.display = fields.dataset.engine === vidEngine ? 'block' : 'none';
+        });
+
+        // 视频处理 - 字段
+        document.getElementById("settingsVideoComfyHost").value = s.comfyui_host || "";
+        document.getElementById("settingsVideoComfyOutputDir").value = s.comfyui_output_dir || "";
+        document.getElementById("settingsComfyVideoWorkflow").value = s.comfyui_video_workflow || "";
+        document.getElementById("settingsArkVideoModel").value = s.ark_video_model || "doubao-seedance-2-0-fast-260128";
+        document.getElementById("settingsArkVideoEndpoint").value = s.ark_video_endpoint || "";
+
+    } catch (e) {
+        console.error("加载设置失败:", e);
+    }
+}
+
+document.getElementById("btnSaveSettings").addEventListener("click", async () => {
+    const settings = {
+        // 文本处理
+        text_engine: document.querySelector('input[name="textEngine"]:checked')?.value || "deepseek",
+        deepseek_api_key: document.getElementById("settingsDeepseekKey").value.trim(),
+        deepseek_api_base: document.getElementById("settingsDeepseekBase").value.trim(),
+        deepseek_model: document.getElementById("settingsDeepseekModel").value.trim(),
+        ark_text_model: document.getElementById("settingsArkTextModel").value.trim(),
+        ark_text_endpoint: document.getElementById("settingsArkTextEndpoint").value.trim(),
+        // 图片处理
+        image_engine: document.querySelector('input[name="imageEngine"]:checked')?.value || "doubao",
+        ark_api_key: document.getElementById("settingsArkKey").value.trim(),
+        ark_image_model: document.getElementById("settingsArkImageModel").value,
+        ark_image_endpoint: document.getElementById("settingsArkImageEndpoint").value.trim(),
+        comfyui_host: document.getElementById("settingsComfyHost").value.trim(),
+        comfyui_output_dir: document.getElementById("settingsComfyOutputDir").value.trim(),
+        comfyui_image_workflow: document.getElementById("settingsComfyImageWorkflow").value.trim(),
+        // 视频处理
+        video_engine: document.querySelector('input[name="videoEngine"]:checked')?.value || "comfyui",
+        comfyui_video_workflow: document.getElementById("settingsComfyVideoWorkflow").value.trim(),
+        ark_video_model: document.getElementById("settingsArkVideoModel").value.trim(),
+        ark_video_endpoint: document.getElementById("settingsArkVideoEndpoint").value.trim(),
+    };
+
+    showStatus("settingsStatus", "正在保存设置...", "loading");
+    const result = await apiFetch("/api/settings/save", {
+        method: "POST",
+        body: JSON.stringify(settings),
+    });
+
+    if (result.success) {
+        showStatus("settingsStatus", result.message || "设置已保存", "success");
+    } else {
+        showStatus("settingsStatus", result.error || "保存失败", "error");
+    }
+});
+
+document.getElementById("btnTestConnection").addEventListener("click", async () => {
+    showStatus("settingsStatus", "正在测试连接...", "loading");
+    const result = await apiFetch("/api/settings/test", { method: "POST" });
+    if (result.success) {
+        showStatus("settingsStatus", result.message || "连接测试通过", "success");
+    } else {
+        showStatus("settingsStatus", result.error || "连接测试失败", "error");
+    }
+});
+
+// 初始化引擎切换
+initEngineToggles();
+
+// ============ 双击复制 ============
+document.addEventListener('dblclick', async (e) => {
+    const el = e.target.closest('input[type="text"], input[type="password"], textarea');
+    if (!el) return;
+
+    const value = el.value;
+    if (!value) return;
+
+    try {
+        await navigator.clipboard.writeText(value);
+        showToast('已复制到剪贴板');
+    } catch {
+        // 降级方案
+        el.select();
+        document.execCommand('copy');
+        showToast('已复制到剪贴板');
+    }
+});
+
+// Toast 提示
+function showToast(message) {
+    let toast = document.getElementById('toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'toast';
+        toast.className = 'toast';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.classList.add('show');
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => toast.classList.remove('show'), 1500);
+}
 
 // ============ 初始化 ============
 document.addEventListener("DOMContentLoaded", () => {
