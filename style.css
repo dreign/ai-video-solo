@@ -5,39 +5,114 @@
     box-sizing: border-box;
 }
 
+/* ========== AI国风视频生成站配色：墨底石青鎏金 ========== */
 :root {
-    --bg: #0f0f14;
-    --bg-card: #1a1a24;
-    --bg-input: #12121a;
-    --border: #2a2a3a;
-    --text: #e0e0e8;
-    --text-dim: #8888a0;
-    --primary: #6366f1;
-    --primary-hover: #818cf8;
-    --success: #22c55e;
-    --success-hover: #4ade80;
-    --accent: #f59e0b;
-    --accent-hover: #fbbf24;
-    --danger: #ef4444;
-    --radius: 8px;
+    /* 主色 - 石青 */
+    --main-cyan: #275963;       /* 深石青·主按钮、导航高亮、生成提交键 */
+    --sub-cyan: #5A9299;        /* 浅豆青·次要按钮、分类标签、输入框聚焦描边 */
+    
+    /* 点缀金 - 鎏金 */
+    --gold: #D4AF50;            /* 哑光鎏金hover、进度、角标 */
+    --light-gold: #E8D8B3;      /* 浅泥金、次要小字强调 */
+    
+    /* 功能状态色 */
+    --danger: #C8453E;          /* 朱砂红｜失败、删除、清空 */
+    --danger-hover: #D55A52;
+    --success: #58A86E;         /* 石绿｜生成成功、完成标识 */
+    --success-hover: #6BB87F;
+    --warn: #E6A249;            /* 赭黄｜任务排队、加载中 */
+    --warn-hover: #F0B35C;
+    
+    /* 中性深色 - 墨底 */
+    --bg: #1A2222;              /* 浓墨黑｜页面全局底色 */
+    --bg-card: #263030;         /* 次墨灰｜卡片面板、输入框底色 */
+    --bg-input: #263030;        /* 次墨灰｜提示词输入区 */
+    --border: #364242;          /* 浅墨灰｜分割线、边框 */
+    --border-light: #4F5C5C;    /* 淡墨灰｜占位文字、辅助说明 */
+    
+    /* 浅色文字 - 宣纸白系 */
+    --text: #F3F1EB;            /* 宣纸白｜标题、按钮大字 */
+    --text-normal: #C9D1D1;     /* 牙白｜正文、提示词常规文字 */
+    --text-dim: #8A9898;        /* 灰字｜注释、边角小字、水印 */
+    --text-gold: #D4AF50;       /* 鎏金强调 */
+    
+    /* 功能映射（兼容旧变量名） */
+    --primary: var(--main-cyan);
+    --primary-hover: var(--sub-cyan);
+    --accent: var(--gold);
+    --accent-hover: var(--light-gold);
+    
+    /* 装饰 */
+    --radius: 6px;
     --max-width: 1200px;
 }
 
+/* ========== 青绿水墨｜日间浅色主题 ========== */
+:root.light {
+    /* 主色 - 青绿 */
+    --main-cyan: #397972;       /* 主青绿，生成按钮、选中Tab */
+    --sub-cyan: #73B0A8;        /* 浅青绿，次要按钮、输入框聚焦 */
+    
+    /* 点缀金 - 赭金 */
+    --gold: #C99F58;            /* 哑光赭金、Hover、角标点缀 */
+    --light-gold: #EBD9BC;      /* 浅泥金 */
+    
+    /* 功能状态色 */
+    --danger: #C2423C;          /* 危险红 */
+    --danger-hover: #D4534D;
+    --success: #529E68;         /* 成功绿 */
+    --success-hover: #63AF79;
+    --warn: #DD9E42;            /* 警示黄 */
+    --warn-hover: #E8AF56;
+    
+    /* 中性浅色 - 水墨宣纸 */
+    --bg: #F8F5EF;              /* 宣纸全局底色 */
+    --bg-card: #FFFFFF;         /* 面板/输入框白底卡片 */
+    --bg-input: #FFFFFF;        /* 输入框底色 */
+    --border: #D9E2E1;          /* 水墨浅灰边框、分割线 */
+    --border-light: #E8EDEC;    /* 更浅边框 */
+    
+    /* 深色文字 - 墨色 */
+    --text: #2C3635;            /* 正文标题墨色 */
+    --text-normal: #596665;     /* 辅助正文 */
+    --text-dim: #92A1A0;        /* 占位提示文字 */
+    --text-gold: #C99F58;       /* 赭金强调 */
+    
+    /* 功能映射（兼容旧变量名） */
+    --primary: var(--main-cyan);
+    --primary-hover: var(--sub-cyan);
+    --accent: var(--gold);
+    --accent-hover: var(--light-gold);
+}
+
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-family: "Microsoft YaHei", "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    /* 深色主题：墨底纹理 */
+    background-image: 
+        radial-gradient(circle at 20% 80%, rgba(39, 89, 99, 0.06) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(39, 89, 99, 0.04) 0%, transparent 50%),
+        radial-gradient(circle at 40% 40%, rgba(212, 175, 80, 0.02) 0%, transparent 30%);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* 浅色主题：宣纸纹理 */
+:root.light body {
+    background-image: 
+        radial-gradient(circle at 20% 80%, rgba(57, 121, 114, 0.04) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(57, 121, 114, 0.02) 0%, transparent 50%),
+        radial-gradient(circle at 40% 40%, rgba(201, 159, 88, 0.02) 0%, transparent 30%);
 }
 
 /* ========== 头部 ========== */
 .app-header {
     background: var(--bg-card);
     border-bottom: 1px solid var(--border);
-    padding: 16px 24px;
-    text-align: center;
+    padding: 12px 0 0 0;
     position: sticky;
     top: 0;
     z-index: 100;
@@ -45,50 +120,67 @@ body {
 
 .app-header h1 {
     font-size: 1.4rem;
-    font-weight: 600;
+    font-weight: 700;
     margin-bottom: 12px;
-    background: linear-gradient(135deg, var(--primary), var(--accent));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--text-gold);
+    letter-spacing: 0.1em;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    text-align: center;
 }
 
 .tab-nav {
     display: flex;
-    justify-content: center;
-    gap: 4px;
-    flex-wrap: wrap;
+    gap: 0;
+    border-bottom: 2px solid var(--border);
+    padding: 0 16px;
+    max-width: 1200px;
+    margin: 0 auto;
 }
 
 .tab-btn {
-    padding: 8px 20px;
-    border: 1px solid var(--border);
-    background: var(--bg);
+    padding: 12px 24px;
+    border: none;
+    border-bottom: 3px solid transparent;
+    background: transparent;
     color: var(--text-dim);
-    border-radius: var(--radius);
+    border-radius: 0;
     cursor: pointer;
     font-size: 0.9rem;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    position: relative;
+    margin-bottom: -2px;
 }
 
 .tab-btn:hover {
-    border-color: var(--primary);
     color: var(--text);
+    background: rgba(39, 89, 99, 0.08);
 }
 
 .tab-btn.active {
-    background: var(--primary);
-    border-color: var(--primary);
-    color: #fff;
+    background: transparent;
+    border-bottom-color: var(--accent);
+    color: var(--text);
+    font-weight: 600;
+}
+
+.tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
 }
 
 /* ========== 主内容区 ========== */
 .app-main {
     flex: 1;
-    max-width: var(--max-width);
+    max-width: 1200px;
     width: 100%;
     margin: 0 auto;
-    padding: 24px;
+    padding: 16px;
 }
 
 .tab-panel {
@@ -103,109 +195,172 @@ body {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 24px;
+    padding: 16px;
+    position: relative;
+}
+
+/* 浅色主题下panel-content使用更明显的边框 */
+:root.light .panel-content {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 /* ========== 表单 ========== */
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 12px;
 }
 
 .form-group label {
     display: block;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 500;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     color: var(--text);
 }
 
 textarea {
     width: 100%;
-    padding: 12px;
+    padding: 10px 12px;
     background: var(--bg-input);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     color: var(--text);
-    font-size: 0.95rem;
-    font-family: inherit;
+    font-size: 0.9rem;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
     resize: vertical;
     line-height: 1.6;
+    transition: all 0.3s ease;
 }
 
 textarea:focus {
     outline: none;
-    border-color: var(--primary);
+    border-color: var(--primary-hover);
+    box-shadow: 0 0 12px rgba(39, 89, 99, 0.15);
 }
 
 /* ========== 选项组 ========== */
 .option-group {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
 }
 
 .option-item {
     display: flex;
     flex-direction: column;
-    padding: 12px 16px;
-    background: var(--bg-input);
+    padding: 10px 14px;
+    background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.option-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 3px;
+    height: 100%;
+    background: linear-gradient(180deg, var(--accent), var(--primary));
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
 .option-item:hover {
-    border-color: var(--primary);
+    border-color: var(--primary-hover);
+    transform: translateX(3px);
+}
+
+.option-item:hover::before {
+    opacity: 1;
 }
 
 .option-item:has(input:checked) {
-    border-color: var(--primary);
-    background: rgba(99, 102, 241, 0.08);
+    border-color: var(--accent);
+    background: linear-gradient(135deg, rgba(39, 89, 99, 0.1) 0%, rgba(212, 175, 80, 0.05) 100%);
+}
+
+:root.light .option-item:has(input:checked) {
+    background: linear-gradient(135deg, rgba(57, 121, 114, 0.08) 0%, rgba(201, 159, 88, 0.04) 100%);
+}
+
+.option-item:has(input:checked)::before {
+    opacity: 1;
 }
 
 .option-item input[type="radio"] {
-    margin-bottom: 6px;
+    margin-bottom: 4px;
 }
 
 .option-label {
     font-weight: 600;
-    font-size: 0.95rem;
-    margin-bottom: 4px;
+    font-size: 0.9rem;
+    margin-bottom: 2px;
+    color: var(--text);
 }
 
 .option-desc {
-    font-size: 0.82rem;
+    font-size: 0.8rem;
     color: var(--text-dim);
 }
 
 /* ========== 画幅比例选择器 ========== */
 .aspect-ratio-group {
     display: flex;
-    gap: 12px;
+    gap: 10px;
 }
 
 .aspect-ratio-item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
-    padding: 14px 24px;
-    background: var(--bg-input);
+    gap: 4px;
+    padding: 12px 20px;
+    background: var(--bg-card);
     border: 2px solid var(--border);
     border-radius: var(--radius);
     cursor: pointer;
-    transition: all 0.2s;
-    min-width: 120px;
+    transition: all 0.3s ease;
+    min-width: 100px;
+    position: relative;
+}
+
+.aspect-ratio-item::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    transition: width 0.3s ease;
 }
 
 .aspect-ratio-item:hover {
-    border-color: var(--primary);
+    border-color: var(--primary-hover);
+    transform: translateY(-2px);
+}
+
+.aspect-ratio-item:hover::after {
+    width: 60%;
 }
 
 .aspect-ratio-item.active {
-    border-color: var(--primary);
-    background: rgba(99, 102, 241, 0.1);
+    border-color: var(--accent);
+    background: linear-gradient(180deg, rgba(39, 89, 99, 0.15) 0%, rgba(212, 175, 80, 0.08) 100%);
+    box-shadow: 0 4px 16px rgba(39, 89, 99, 0.15);
+}
+
+:root.light .aspect-ratio-item.active {
+    background: linear-gradient(180deg, rgba(57, 121, 114, 0.1) 0%, rgba(201, 159, 88, 0.05) 100%);
+}
+
+.aspect-ratio-item.active::after {
+    width: 80%;
 }
 
 .aspect-ratio-item input[type="radio"] {
@@ -213,23 +368,23 @@ textarea:focus {
 }
 
 .ratio-icon {
-    font-size: 1.6rem;
+    font-size: 1.4rem;
     letter-spacing: 2px;
     color: var(--text);
 }
 
 .ratio-label {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 500;
     color: var(--text);
 }
 
 .aspect-ratio-badge {
-    padding: 8px 14px;
-    background: rgba(99, 102, 241, 0.15);
+    padding: 6px 12px;
+    background: rgba(39, 89, 99, 0.1);
     border: 1px solid var(--primary);
     border-radius: var(--radius);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--primary);
     white-space: nowrap;
     align-self: center;
@@ -238,20 +393,39 @@ textarea:focus {
 /* ========== 按钮 ========== */
 .action-bar {
     display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
+    gap: 8px;
+    margin-bottom: 12px;
     flex-wrap: wrap;
 }
 
 .btn {
-    padding: 10px 20px;
-    border: none;
+    padding: 8px 16px;
+    border: 1px solid transparent;
     border-radius: var(--radius);
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 500;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
     white-space: nowrap;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    letter-spacing: 0.02em;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    transition: left 0.5s ease;
+}
+
+.btn:hover::before {
+    left: 100%;
 }
 
 .btn:disabled {
@@ -260,49 +434,61 @@ textarea:focus {
 }
 
 .btn-primary {
-    background: #374151;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--sub-cyan) 100%);
+    border-color: var(--primary-hover);
     color: var(--text);
 }
 
 .btn-primary:hover:not(:disabled) {
-    background: #4b5563;
+    background: linear-gradient(135deg, var(--primary-hover) 0%, var(--primary) 100%);
+    box-shadow: 0 0 16px rgba(39, 89, 99, 0.35);
+    transform: translateY(-1px);
 }
 
 .btn-success {
-    background: var(--success);
-    color: #000;
+    background: linear-gradient(135deg, var(--success) 0%, var(--success-hover) 100%);
+    border-color: var(--success-hover);
+    color: var(--text);
 }
 
 .btn-success:hover:not(:disabled) {
-    background: var(--success-hover);
+    background: linear-gradient(135deg, var(--success-hover) 0%, var(--success) 100%);
+    box-shadow: 0 0 16px rgba(88, 168, 110, 0.35);
+    transform: translateY(-1px);
 }
 
 .btn-accent {
-    background: var(--accent);
-    color: #000;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--light-gold) 100%);
+    border-color: var(--accent-hover);
+    color: var(--bg);
+    font-weight: 600;
 }
 
 .btn-accent:hover:not(:disabled) {
-    background: var(--accent-hover);
+    background: linear-gradient(135deg, var(--accent-hover) 0%, var(--accent) 100%);
+    box-shadow: 0 0 16px rgba(212, 175, 80, 0.35);
+    transform: translateY(-1px);
 }
 
 .btn-toggle {
-    background: var(--bg-panel);
+    background: var(--bg-card);
     color: var(--text-dim);
     border: 1px solid var(--border);
     margin-left: auto;
 }
 
 .btn-toggle:hover {
-    background: var(--primary);
-    color: #fff;
-    border-color: var(--primary);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--sub-cyan) 100%);
+    color: var(--text);
+    border-color: var(--primary-hover);
+    box-shadow: 0 0 12px rgba(39, 89, 99, 0.25);
 }
 
 .btn-toggle.active {
-    background: var(--primary);
-    color: #fff;
-    border-color: var(--primary);
+    background: linear-gradient(135deg, var(--accent) 0%, var(--light-gold) 100%);
+    color: var(--bg);
+    border-color: var(--accent-hover);
+    box-shadow: 0 0 12px rgba(212, 175, 80, 0.25);
 }
 
 /* ========== Markdown 预览 ========== */
@@ -310,63 +496,71 @@ textarea:focus {
     background: var(--bg-input);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 20px 24px;
+    padding: 16px 20px;
     min-height: 400px;
     overflow-y: auto;
-    line-height: 1.8;
+    line-height: 1.7;
     color: var(--text);
-    font-size: 0.95rem;
+    font-size: 0.9rem;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 .markdown-preview h1,
 .markdown-preview h2,
 .markdown-preview h3 {
-    margin-top: 1.2em;
-    margin-bottom: 0.5em;
+    margin-top: 1em;
+    margin-bottom: 0.4em;
     font-weight: 600;
-    color: var(--primary);
+    color: var(--text-gold);
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    letter-spacing: 0.03em;
 }
 
-.markdown-preview h1 { font-size: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
-.markdown-preview h2 { font-size: 1.25rem; }
-.markdown-preview h3 { font-size: 1.1rem; }
+.markdown-preview h1 { font-size: 1.4rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
+.markdown-preview h2 { font-size: 1.2rem; }
+.markdown-preview h3 { font-size: 1.05rem; }
 
 .markdown-preview p {
-    margin: 0.6em 0;
+    margin: 0.5em 0;
 }
 
 .markdown-preview ul,
 .markdown-preview ol {
     padding-left: 1.5em;
-    margin: 0.5em 0;
+    margin: 0.4em 0;
 }
 
 .markdown-preview li {
-    margin: 0.25em 0;
+    margin: 0.2em 0;
 }
 
 .markdown-preview blockquote {
-    border-left: 3px solid var(--primary);
-    padding: 0.3em 1em;
-    margin: 0.8em 0;
+    border-left: 3px solid var(--accent);
+    padding: 0.4em 1em;
+    margin: 0.6em 0;
     color: var(--text-dim);
-    background: rgba(99, 102, 241, 0.05);
+    background: linear-gradient(90deg, rgba(212, 175, 80, 0.06) 0%, transparent 100%);
+    font-style: italic;
 }
 
 .markdown-preview code {
-    background: rgba(255, 255, 255, 0.08);
-    padding: 2px 6px;
+    background: rgba(127, 127, 127, 0.1);
+    padding: 2px 5px;
     border-radius: 3px;
     font-family: "Consolas", "Monaco", monospace;
-    font-size: 0.88em;
+    font-size: 0.85em;
 }
 
 .markdown-preview pre {
-    background: rgba(0, 0, 0, 0.25);
-    padding: 14px 18px;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 12px 16px;
     border-radius: 6px;
     overflow-x: auto;
-    margin: 0.8em 0;
+    margin: 0.6em 0;
+}
+
+:root.dark .markdown-preview pre {
+    background: rgba(0, 0, 0, 0.2);
 }
 
 .markdown-preview pre code {
@@ -375,39 +569,43 @@ textarea:focus {
 }
 
 .markdown-preview strong {
-    color: #f59e0b;
+    color: var(--accent);
+    font-weight: 600;
 }
 
 .markdown-preview hr {
     border: none;
     border-top: 1px solid var(--border);
-    margin: 1.2em 0;
+    margin: 1em 0;
 }
 
 .markdown-preview table {
     border-collapse: collapse;
     width: 100%;
-    margin: 0.8em 0;
+    margin: 0.6em 0;
 }
 
 .markdown-preview th,
 .markdown-preview td {
     border: 1px solid var(--border);
-    padding: 8px 12px;
+    padding: 6px 10px;
     text-align: left;
 }
 
 .markdown-preview th {
-    background: rgba(99, 102, 241, 0.1);
+    background: rgba(39, 89, 99, 0.1);
+    color: var(--text-gold);
+    font-weight: 600;
 }
 
 /* ========== 状态消息 ========== */
 .status-msg {
-    margin-top: 12px;
+    margin-top: 10px;
     padding: 10px 14px;
     border-radius: var(--radius);
-    font-size: 0.88rem;
+    font-size: 0.85rem;
     display: none;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 .status-msg.show {
@@ -415,32 +613,32 @@ textarea:focus {
 }
 
 .status-msg.success {
-    background: rgba(34, 197, 94, 0.1);
+    background: rgba(88, 168, 110, 0.1);
     border: 1px solid var(--success);
     color: var(--success);
 }
 
 .status-msg.error {
-    background: rgba(239, 68, 68, 0.1);
+    background: rgba(200, 69, 62, 0.1);
     border: 1px solid var(--danger);
     color: var(--danger);
 }
 
 .status-msg.loading {
-    background: rgba(245, 158, 11, 0.1);
+    background: rgba(212, 175, 80, 0.1);
     border: 1px solid var(--accent);
     color: var(--accent);
 }
 
 /* ========== 编辑器 ========== */
 .editor-container {
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 .editor-container textarea {
     min-height: 400px;
     font-family: "Consolas", "Monaco", "Courier New", monospace;
-    font-size: 0.88rem;
+    font-size: 0.85rem;
     line-height: 1.5;
 }
 
@@ -448,81 +646,97 @@ textarea:focus {
 .storyboard-list {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
 }
 
 .storyboard-scene {
-    background: var(--bg-input);
+    background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 16px;
+    padding: 14px;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.storyboard-scene:hover {
+    border-color: var(--border-light);
+    box-shadow: 0 4px 16px rgba(39, 89, 99, 0.1);
 }
 
 .storyboard-scene .scene-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
-    padding-bottom: 8px;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
     border-bottom: 1px solid var(--border);
 }
 
 .storyboard-scene .scene-id {
     font-weight: 600;
-    font-size: 1rem;
-    color: var(--primary);
+    font-size: 0.95rem;
+    color: var(--text-gold);
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 .storyboard-scene .scene-duration {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--text-dim);
     background: var(--bg);
-    padding: 2px 10px;
+    padding: 2px 8px;
     border-radius: 12px;
 }
 
 .storyboard-scene .scene-desc {
-    font-size: 0.88rem;
+    font-size: 0.85rem;
     color: var(--text-dim);
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .storyboard-scene .scene-field {
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .storyboard-scene .scene-field label {
     display: block;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--text-dim);
-    margin-bottom: 4px;
+    margin-bottom: 3px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .storyboard-scene .scene-field textarea {
-    min-height: 80px;
-    font-size: 0.82rem;
+    min-height: 60px;
+    font-size: 0.8rem;
+    padding: 8px 10px;
 }
 
 .storyboard-scene .scene-media {
     display: flex;
-    gap: 12px;
-    margin-top: 12px;
+    gap: 10px;
+    margin-top: 10px;
     flex-wrap: wrap;
 }
 
 .storyboard-scene .scene-media img,
 .storyboard-scene .scene-media video {
-    max-width: 320px;
-    max-height: 180px;
+    max-width: 280px;
+    max-height: 160px;
     border-radius: 4px;
     border: 1px solid var(--border);
+    transition: all 0.3s ease;
+}
+
+.storyboard-scene .scene-media img:hover,
+.storyboard-scene .scene-media video:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 12px rgba(212, 175, 80, 0.2);
 }
 
 .storyboard-scene .scene-media .media-placeholder {
-    width: 320px;
-    height: 180px;
+    width: 280px;
+    height: 160px;
     background: var(--bg);
     border: 1px dashed var(--border);
     border-radius: 4px;
@@ -530,40 +744,43 @@ textarea:focus {
     align-items: center;
     justify-content: center;
     color: var(--text-dim);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 .media-box {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
     align-items: center;
 }
 
 .media-box label {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--text-dim);
 }
 
 .btn-small {
-    padding: 4px 10px;
-    font-size: 0.75rem;
-    background: var(--bg);
+    padding: 5px 10px;
+    font-size: 0.72rem;
+    background: var(--bg-card);
     border: 1px solid var(--border);
     color: var(--text-dim);
     border-radius: 4px;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.3s ease;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 .btn-small:hover {
-    border-color: var(--primary);
+    border-color: var(--primary-hover);
     color: var(--text);
+    background: rgba(39, 89, 99, 0.15);
 }
 
 .field-value {
     display: block;
-    font-size: 0.82rem;
+    font-size: 0.8rem;
     color: var(--text);
     word-break: break-all;
     padding: 4px 8px;
@@ -576,10 +793,10 @@ textarea:focus {
 /* 分镜横排预览 */
 .storyboard-preview-row {
     display: flex;
-    gap: 12px;
+    gap: 10px;
     overflow-x: auto;
-    padding: 12px 0;
-    margin-bottom: 20px;
+    padding: 10px 0;
+    margin-bottom: 16px;
 }
 
 .storyboard-preview-row .preview-item {
@@ -588,74 +805,103 @@ textarea:focus {
 }
 
 .storyboard-preview-row .preview-item img {
-    width: 200px;
-    height: 112px;
+    width: 180px;
+    height: 100px;
     object-fit: cover;
     border-radius: 4px;
     border: 1px solid var(--border);
+    transition: all 0.3s ease;
+}
+
+.storyboard-preview-row .preview-item img:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 12px rgba(212, 175, 80, 0.2);
 }
 
 .storyboard-preview-row .preview-item video {
-    width: 200px;
-    height: 112px;
+    width: 180px;
+    height: 100px;
     border-radius: 4px;
     border: 1px solid var(--border);
+    transition: all 0.3s ease;
+}
+
+.storyboard-preview-row .preview-item video:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 12px rgba(212, 175, 80, 0.2);
 }
 
 .storyboard-preview-row .preview-label {
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     color: var(--text-dim);
-    margin-top: 4px;
+    margin-top: 3px;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 /* ========== 角色列表 ========== */
 .character-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
 }
 
 .character-card {
-    background: var(--bg-input);
+    background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 16px;
+    padding: 14px;
+    transition: all 0.3s ease;
+}
+
+.character-card:hover {
+    border-color: var(--border-light);
+    box-shadow: 0 4px 16px rgba(39, 89, 99, 0.1);
 }
 
 .character-card .char-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .character-card .char-name {
     font-weight: 600;
-    font-size: 1rem;
+    font-size: 0.95rem;
+    color: var(--text-gold);
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 .character-card .char-name-en {
-    font-size: 0.82rem;
+    font-size: 0.8rem;
     color: var(--text-dim);
 }
 
 .character-card .char-prompt {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     color: var(--text-dim);
-    max-height: 120px;
+    max-height: 100px;
     overflow-y: auto;
-    background: var(--bg);
+    background: var(--bg-input);
     padding: 8px;
     border-radius: 4px;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     white-space: pre-wrap;
     word-break: break-all;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    line-height: 1.5;
 }
 
 .character-card .char-img {
     width: 100%;
     border-radius: 4px;
     border: 1px solid var(--border);
+    transition: all 0.3s ease;
+}
+
+.character-card .char-img:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 12px rgba(212, 175, 80, 0.2);
 }
 
 .character-card .char-img-placeholder {
@@ -668,21 +914,22 @@ textarea:focus {
     align-items: center;
     justify-content: center;
     color: var(--text-dim);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 /* ========== 视频页面 - 新布局 ========== */
 .video-panel {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
 }
 
 /* 主播放器容器 */
 .main-player-container {
     position: relative;
     width: 100%;
-    background: #000;
+    background: var(--bg);
     border-radius: var(--radius);
     overflow: hidden;
     aspect-ratio: 16 / 9;
@@ -718,28 +965,30 @@ textarea:focus {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
-    padding: 24px 48px;
-    background: rgba(99, 102, 241, 0.9);
-    border: none;
+    gap: 10px;
+    padding: 24px 44px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--sub-cyan) 100%);
+    border: 1px solid var(--primary-hover);
     border-radius: var(--radius);
     cursor: pointer;
-    transition: all 0.2s;
-    color: #fff;
+    transition: all 0.3s ease;
+    color: var(--text);
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 .play-all-btn:hover {
-    background: var(--primary);
+    background: linear-gradient(135deg, var(--primary-hover) 0%, var(--primary) 100%);
+    box-shadow: 0 0 24px rgba(39, 89, 99, 0.4);
     transform: scale(1.05);
 }
 
 .play-all-btn .play-icon {
-    font-size: 3rem;
+    font-size: 2.5rem;
     line-height: 1;
 }
 
 .play-all-btn span:last-child {
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 500;
 }
 
@@ -749,51 +998,52 @@ textarea:focus {
     justify-content: space-between;
     align-items: center;
     padding: 12px 16px;
-    background: var(--bg-input);
+    background: var(--bg-card);
     border-radius: var(--radius);
     border: 1px solid var(--border);
 }
 
 .playback-info .current-scene {
     font-weight: 600;
-    color: var(--primary);
-    font-size: 1rem;
+    color: var(--text-gold);
+    font-size: 0.95rem;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 .playback-info .playback-progress {
     color: var(--text-dim);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
 }
 
 /* 分镜时间轴容器 */
 .storyboard-timeline-container {
-    background: var(--bg-input);
+    background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 16px;
+    padding: 12px;
 }
 
 /* 分镜时间轴 */
 .storyboard-timeline {
     display: flex;
-    gap: 12px;
+    gap: 10px;
     overflow-x: auto;
-    padding: 8px 4px;
+    padding: 6px 4px;
     scroll-behavior: smooth;
 }
 
 .storyboard-timeline::-webkit-scrollbar {
-    height: 8px;
+    height: 6px;
 }
 
 .storyboard-timeline::-webkit-scrollbar-track {
     background: var(--bg);
-    border-radius: 4px;
+    border-radius: 3px;
 }
 
 .storyboard-timeline::-webkit-scrollbar-thumb {
     background: var(--border);
-    border-radius: 4px;
+    border-radius: 3px;
 }
 
 .storyboard-timeline::-webkit-scrollbar-thumb:hover {
@@ -803,9 +1053,9 @@ textarea:focus {
 /* 分镜缩略图项 */
 .timeline-item {
     flex-shrink: 0;
-    width: 160px;
+    width: 140px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
     border-radius: var(--radius);
     overflow: hidden;
     border: 2px solid transparent;
@@ -813,13 +1063,14 @@ textarea:focus {
 }
 
 .timeline-item:hover {
-    transform: translateY(-4px);
-    border-color: var(--primary);
+    transform: translateY(-3px);
+    border-color: var(--primary-hover);
+    box-shadow: 0 4px 16px rgba(39, 89, 99, 0.2);
 }
 
 .timeline-item.active {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(212, 175, 80, 0.25), 0 4px 16px rgba(212, 175, 80, 0.15);
 }
 
 .timeline-item.played {
@@ -829,7 +1080,7 @@ textarea:focus {
 .timeline-item .timeline-thumb {
     width: 100%;
     aspect-ratio: 16 / 9;
-    background: var(--bg);
+    background: var(--bg-input);
     position: relative;
     overflow: hidden;
 }
@@ -848,23 +1099,25 @@ textarea:focus {
     align-items: center;
     justify-content: center;
     color: var(--text-dim);
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     background: var(--bg);
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 .timeline-item .timeline-info {
-    padding: 8px;
+    padding: 6px;
 }
 
 .timeline-item .timeline-scene-id {
     font-weight: 600;
-    font-size: 0.85rem;
-    color: var(--text);
+    font-size: 0.8rem;
+    color: var(--text-gold);
     margin-bottom: 2px;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 .timeline-item .timeline-duration {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     color: var(--text-dim);
 }
 
@@ -872,15 +1125,15 @@ textarea:focus {
     position: absolute;
     top: 4px;
     right: 4px;
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
-    background: var(--success);
+    background: linear-gradient(135deg, var(--success) 0%, var(--success-hover) 100%);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.7rem;
-    color: #fff;
+    font-size: 0.65rem;
+    color: var(--text);
 }
 
 /* ========== 分镜缩略图预览浮层 ========== */
@@ -888,15 +1141,15 @@ textarea:focus {
     position: fixed;
     z-index: 10000;
     background: var(--bg-card);
-    border: 2px solid var(--primary);
+    border: 2px solid var(--accent);
     border-radius: var(--radius);
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
-    padding: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 24px rgba(212, 175, 80, 0.15);
+    padding: 10px;
     opacity: 0;
     transform: scale(0.95);
     transition: all 0.2s ease-out;
     pointer-events: none;
-    max-width: 420px;
+    max-width: 380px;
 }
 
 .timeline-preview.show {
@@ -907,12 +1160,12 @@ textarea:focus {
 .timeline-preview .preview-content {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
 }
 
 .timeline-preview .preview-content img {
-    width: 400px;
-    height: 225px;
+    width: 360px;
+    height: 200px;
     object-fit: cover;
     border-radius: 4px;
     background: var(--bg);
@@ -924,59 +1177,84 @@ textarea:focus {
 
 .timeline-preview .preview-scene-id {
     font-weight: 600;
-    font-size: 1rem;
-    color: var(--primary);
-    margin-bottom: 4px;
+    font-size: 0.95rem;
+    color: var(--text-gold);
+    margin-bottom: 3px;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 .timeline-preview .preview-desc {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--text-dim);
-    line-height: 1.4;
-    max-height: 60px;
+    line-height: 1.5;
+    max-height: 54px;
     overflow: hidden;
     text-overflow: ellipsis;
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 /* ========== 设置页面 ========== */
 .tab-btn-settings {
     margin-left: auto;
     background: transparent;
-    border-color: var(--primary);
-    color: var(--primary);
+    color: var(--accent);
 }
 
 .tab-btn-settings:hover {
-    background: var(--primary);
-    color: #fff;
+    background: rgba(212, 175, 80, 0.1);
+    color: var(--accent);
 }
 
 .tab-btn-settings.active {
-    background: var(--primary);
-    color: #fff;
+    background: transparent;
+    border-bottom-color: var(--accent);
+    color: var(--accent);
+}
+
+/* 主题切换按钮 */
+.tab-btn-theme {
+    margin-left: 8px;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 1rem;
+    padding: 12px 16px;
+    transition: all 0.3s ease;
+}
+
+.tab-btn-theme:hover {
+    color: var(--gold);
+    background: rgba(212, 175, 80, 0.1);
+    transform: rotate(15deg);
+}
+
+:root.light .tab-btn-settings:hover,
+:root.light .tab-btn-settings.active {
+    color: var(--accent);
 }
 
 .settings-section {
-    margin-bottom: 28px;
-    padding-bottom: 24px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
     border-bottom: 1px solid var(--border);
 }
 
 .settings-section:last-of-type {
     border-bottom: none;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 .settings-title {
-    font-size: 1.05rem;
+    font-size: 1rem;
     font-weight: 600;
-    color: var(--primary);
-    margin-bottom: 16px;
-    padding-left: 12px;
-    border-left: 3px solid var(--primary);
+    color: var(--text-gold);
+    margin-bottom: 12px;
+    padding-left: 10px;
+    border-left: 3px solid var(--accent);
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    letter-spacing: 0.03em;
 }
 
 input[type="text"],
@@ -987,28 +1265,29 @@ input[type="password"] {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     color: var(--text);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-family: "Consolas", "Monaco", "Courier New", monospace;
-    transition: border-color 0.2s;
+    transition: all 0.3s ease;
 }
 
 input[type="text"]:focus,
 input[type="password"]:focus {
     outline: none;
-    border-color: var(--primary);
+    border-color: var(--primary-hover);
+    box-shadow: 0 0 12px rgba(39, 89, 99, 0.15);
 }
 
 input[type="text"]::placeholder,
 input[type="password"]::placeholder {
     color: var(--text-dim);
-    opacity: 0.5;
+    opacity: 0.6;
 }
 
 /* ========== 设置 - 引擎切换 ========== */
 .engine-toggle {
     display: flex;
     gap: 4px;
-    background: var(--bg-panel);
+    background: linear-gradient(180deg, rgba(15, 29, 50, 0.6) 0%, rgba(10, 22, 40, 0.8) 100%);
     border-radius: var(--radius);
     padding: 3px;
     border: 1px solid var(--border);
@@ -1017,10 +1296,10 @@ input[type="password"]::placeholder {
 .engine-option {
     flex: 1;
     text-align: center;
-    padding: 8px 12px;
+    padding: 10px 14px;
     border-radius: calc(var(--radius) - 2px);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
     user-select: none;
 }
 
@@ -1032,7 +1311,8 @@ input[type="password"]::placeholder {
     font-size: 0.88rem;
     font-weight: 500;
     color: var(--text-dim);
-    transition: color 0.2s;
+    transition: color 0.3s ease;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 .engine-option:hover .engine-label {
@@ -1040,41 +1320,43 @@ input[type="password"]::placeholder {
 }
 
 .engine-option.active {
-    background: var(--primary);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--sub-cyan) 100%);
+    border: 1px solid var(--primary-hover);
 }
 
 .engine-option.active .engine-label {
-    color: #fff;
+    color: var(--text);
     font-weight: 600;
 }
 
 /* ========== 设置 - select 下拉 ========== */
 .settings-select {
     width: 100%;
-    padding: 10px 12px;
-    background: var(--bg-input);
+    padding: 12px 14px;
+    background: linear-gradient(180deg, rgba(10, 22, 40, 0.8) 0%, rgba(8, 18, 35, 0.9) 100%);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     color: var(--text);
     font-size: 0.9rem;
     cursor: pointer;
-    transition: border-color 0.2s;
+    transition: all 0.3s ease;
     appearance: auto;
 }
 
 .settings-select:focus {
     outline: none;
-    border-color: var(--primary);
+    border-color: var(--primary-hover);
+    box-shadow: 0 0 15px rgba(30, 95, 138, 0.2);
 }
 
 .settings-select option {
-    background: var(--bg-panel);
+    background: var(--bg-card);
     color: var(--text);
 }
 
 /* ========== 引擎字段过渡 ========== */
 .engine-fields {
-    transition: opacity 0.2s;
+    transition: opacity 0.3s ease;
 }
 
 /* ========== 旧历史样式（保留兼容） ========== */
@@ -1085,10 +1367,16 @@ input[type="password"]::placeholder {
 }
 
 .video-card {
-    background: var(--bg-input);
+    background: linear-gradient(180deg, rgba(15, 29, 50, 0.6) 0%, rgba(10, 22, 40, 0.8) 100%);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.video-card:hover {
+    border-color: var(--border-light);
+    box-shadow: 0 4px 20px rgba(30, 95, 138, 0.15);
 }
 
 .video-card video {
@@ -1097,19 +1385,21 @@ input[type="password"]::placeholder {
 }
 
 .video-card .video-info {
-    padding: 12px;
+    padding: 14px;
 }
 
 .video-card .video-scene-id {
     font-weight: 600;
     font-size: 0.9rem;
-    color: var(--primary);
+    color: var(--text-gold);
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 .video-card .video-desc {
     font-size: 0.82rem;
     color: var(--text-dim);
     margin-top: 4px;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 .video-card .video-duration {
@@ -1126,7 +1416,8 @@ input[type="password"]::placeholder {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(10, 22, 40, 0.85);
+    backdrop-filter: blur(4px);
     z-index: 9999;
     flex-direction: column;
     align-items: center;
@@ -1141,8 +1432,8 @@ input[type="password"]::placeholder {
 .loading-spinner {
     width: 48px;
     height: 48px;
-    border: 4px solid rgba(255, 255, 255, 0.2);
-    border-top-color: var(--primary);
+    border: 3px solid rgba(30, 95, 138, 0.3);
+    border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
 }
@@ -1152,9 +1443,10 @@ input[type="password"]::placeholder {
 }
 
 .loading-text {
-    color: #fff;
+    color: var(--text-gold);
     font-size: 1rem;
-    letter-spacing: 1px;
+    letter-spacing: 0.1em;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 /* ========== 空状态 ========== */
@@ -1163,6 +1455,7 @@ input[type="password"]::placeholder {
     text-align: center;
     padding: 40px 20px;
     font-size: 0.9rem;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 /* ========== 项目历史列表 ========== */
@@ -1170,11 +1463,12 @@ input[type="password"]::placeholder {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 12px;
-    background: var(--bg-input);
+    padding: 10px 14px;
+    background: linear-gradient(180deg, rgba(15, 29, 50, 0.6) 0%, rgba(10, 22, 40, 0.8) 100%);
     border-radius: var(--radius);
     margin-bottom: 12px;
     font-size: 0.85rem;
+    border: 1px solid var(--border);
 }
 
 .project-id-label {
@@ -1182,8 +1476,9 @@ input[type="password"]::placeholder {
 }
 
 #currentProjectId {
-    color: var(--primary);
+    color: var(--text-gold);
     font-weight: 600;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 .project-history {
@@ -1203,18 +1498,22 @@ input[type="password"]::placeholder {
     font-size: 1rem;
     color: var(--text-dim);
     margin-bottom: 0;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 .btn-new-project {
-    background: var(--primary);
-    color: #fff;
-    border: none;
-    padding: 6px 14px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--sub-cyan) 100%);
+    color: var(--text);
+    border: 1px solid var(--primary-hover);
+    padding: 8px 16px;
     font-size: 0.82rem;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    transition: all 0.3s ease;
 }
 
 .btn-new-project:hover {
-    background: var(--primary-hover);
+    background: linear-gradient(135deg, var(--primary-hover) 0%, var(--primary) 100%);
+    box-shadow: 0 0 15px rgba(30, 95, 138, 0.3);
 }
 
 .project-list {
@@ -1229,28 +1528,30 @@ input[type="password"]::placeholder {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 14px;
-    background: var(--bg-input);
+    padding: 12px 16px;
+    background: linear-gradient(180deg, rgba(15, 29, 50, 0.6) 0%, rgba(10, 22, 40, 0.8) 100%);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     cursor: pointer;
-    transition: border-color 0.15s;
+    transition: all 0.3s ease;
 }
 
 .project-item:hover {
-    border-color: var(--primary);
+    border-color: var(--primary-hover);
+    box-shadow: 0 2px 10px rgba(30, 95, 138, 0.15);
 }
 
 .project-item.active {
-    border-color: var(--primary);
-    background: rgba(99, 102, 241, 0.08);
+    border-color: var(--accent);
+    background: linear-gradient(135deg, rgba(30, 95, 138, 0.15) 0%, rgba(201, 162, 39, 0.08) 100%);
 }
 
 .project-item .proj-id {
     font-weight: 600;
-    color: var(--primary);
+    color: var(--text-gold);
     font-size: 0.9rem;
     min-width: 45px;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 .project-item .proj-name {
@@ -1261,6 +1562,7 @@ input[type="password"]::placeholder {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 .project-item .proj-time {
@@ -1279,10 +1581,10 @@ input[type="password"]::placeholder {
     display: none;
     max-width: 90vw;
     max-height: 90vh;
-    background: var(--bg-card);
-    border: 2px solid var(--border);
+    background: linear-gradient(180deg, rgba(15, 29, 50, 0.98) 0%, rgba(10, 22, 40, 0.99) 100%);
+    border: 2px solid var(--accent);
     border-radius: var(--radius);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(201, 162, 39, 0.2);
     padding: 12px;
 }
 
@@ -1304,6 +1606,7 @@ input[type="password"]::placeholder {
     color: var(--text-dim);
     font-size: 0.82rem;
     border-top: 1px solid var(--border);
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 /* ========== Toast 提示 ========== */
@@ -1312,42 +1615,47 @@ input[type="password"]::placeholder {
     bottom: 40px;
     left: 50%;
     transform: translateX(-50%);
-    background: var(--primary);
-    color: #fff;
-    padding: 10px 24px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--sub-cyan) 100%);
+    color: var(--text);
+    padding: 12px 28px;
     border-radius: 20px;
     font-size: 0.9rem;
     z-index: 99999;
     opacity: 0;
-    transition: opacity 0.25s;
+    transition: all 0.3s ease;
     pointer-events: none;
+    border: 1px solid var(--primary-hover);
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    letter-spacing: 0.05em;
 }
 
 .toast.show {
     opacity: 1;
+    box-shadow: 0 4px 20px rgba(30, 95, 138, 0.4);
 }
 
 /* ========== 响应式布局 ========== */
 @media (max-width: 768px) {
     .app-header {
-        padding: 12px 16px;
+        padding: 14px 16px;
     }
 
     .app-header h1 {
-        font-size: 1.2rem;
+        font-size: 1.3rem;
+        letter-spacing: 0.1em;
     }
 
     .tab-btn {
-        padding: 6px 14px;
+        padding: 8px 16px;
         font-size: 0.82rem;
     }
 
     .app-main {
-        padding: 12px;
+        padding: 16px;
     }
 
     .panel-content {
-        padding: 16px;
+        padding: 18px;
     }
 
     .action-bar {

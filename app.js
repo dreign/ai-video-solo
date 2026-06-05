@@ -964,17 +964,35 @@ function renderVideoList(videos) {
 }
 
 // ============ 分镜缩略图预览浮层 ============
+let timelinePreviewTimer = null;
+
 function showTimelinePreview(scene, targetEl) {
-    // 移除已存在的预览浮层
-    hideTimelinePreview();
+    // 清除之前的定时器，防止闪烁
+    if (timelinePreviewTimer) {
+        clearTimeout(timelinePreviewTimer);
+        timelinePreviewTimer = null;
+    }
 
-    // 创建预览浮层
-    const preview = document.createElement('div');
-    preview.id = 'timelinePreview';
-    preview.className = 'timeline-preview';
-
-    // 优先显示首帧图，如果没有则显示尾帧图
+    // 如果预览已存在，只更新内容不重新创建
+    let preview = document.getElementById('timelinePreview');
     const imgUrl = scene.img_start || scene.img_end;
+
+    if (!preview) {
+        preview = document.createElement('div');
+        preview.id = 'timelinePreview';
+        preview.className = 'timeline-preview';
+        // 阻止预览层上的鼠标事件穿透到底层
+        preview.addEventListener('mouseenter', () => {
+            if (timelinePreviewTimer) {
+                clearTimeout(timelinePreviewTimer);
+                timelinePreviewTimer = null;
+            }
+        });
+        preview.addEventListener('mouseleave', () => {
+            hideTimelinePreview();
+        });
+        document.body.appendChild(preview);
+    }
 
     preview.innerHTML = `
         <div class="preview-content">
@@ -985,8 +1003,6 @@ function showTimelinePreview(scene, targetEl) {
             </div>
         </div>
     `;
-
-    document.body.appendChild(preview);
 
     // 计算位置 - 显示在目标元素上方
     const rect = targetEl.getBoundingClientRect();
@@ -1016,20 +1032,42 @@ function showTimelinePreview(scene, targetEl) {
 }
 
 function hideTimelinePreview() {
-    const preview = document.getElementById('timelinePreview');
-    if (preview) {
-        preview.remove();
-    }
+    // 延迟隐藏，避免快速移动时闪烁
+    timelinePreviewTimer = setTimeout(() => {
+        const preview = document.getElementById('timelinePreview');
+        if (preview) {
+            preview.remove();
+        }
+        timelinePreviewTimer = null;
+    }, 100);
 }
 
 // ============ 图片预览 ============
+let imagePreviewTimer = null;
+
 function showImagePreview(src) {
+    // 清除之前的定时器，防止闪烁
+    if (imagePreviewTimer) {
+        clearTimeout(imagePreviewTimer);
+        imagePreviewTimer = null;
+    }
+
     let preview = document.getElementById("imagePreview");
     if (!preview) {
         preview = document.createElement("div");
         preview.id = "imagePreview";
         preview.className = "image-preview";
         preview.innerHTML = '<img src="" alt="预览">';
+        // 阻止预览层上的鼠标事件穿透到底层
+        preview.addEventListener('mouseenter', () => {
+            if (imagePreviewTimer) {
+                clearTimeout(imagePreviewTimer);
+                imagePreviewTimer = null;
+            }
+        });
+        preview.addEventListener('mouseleave', () => {
+            hideImagePreview();
+        });
         document.body.appendChild(preview);
     }
     preview.querySelector("img").src = src;
@@ -1037,10 +1075,14 @@ function showImagePreview(src) {
 }
 
 function hideImagePreview() {
-    const preview = document.getElementById("imagePreview");
-    if (preview) {
-        preview.classList.remove("show");
-    }
+    // 延迟隐藏，避免快速移动时闪烁
+    imagePreviewTimer = setTimeout(() => {
+        const preview = document.getElementById("imagePreview");
+        if (preview) {
+            preview.classList.remove("show");
+        }
+        imagePreviewTimer = null;
+    }, 100);
 }
 
 // ============ 设置页面 ============
@@ -1224,8 +1266,34 @@ function showToast(message) {
     toast._timer = setTimeout(() => toast.classList.remove('show'), 1500);
 }
 
+// ============ 主题切换 ============
+function initTheme() {
+    const themeToggle = document.getElementById('themeToggle');
+    const root = document.documentElement;
+
+    // 从localStorage读取主题设置
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') {
+        root.classList.add('light');
+        themeToggle.textContent = '☀️';
+    } else {
+        root.classList.remove('light');
+        themeToggle.textContent = '🌙';
+    }
+
+    themeToggle.addEventListener('click', () => {
+        const isLight = root.classList.toggle('light');
+        themeToggle.textContent = isLight ? '☀️' : '🌙';
+        localStorage.setItem('theme', isLight ? 'light' : 'dark');
+        // 强制刷新创意页面数据以应用新主题
+        loadCreativeData();
+        loadProjectList();
+    });
+}
+
 // ============ 初始化 ============
 document.addEventListener("DOMContentLoaded", () => {
+    initTheme();
     loadProjectList();
     loadTabData("creative");
 });

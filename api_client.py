@@ -183,7 +183,7 @@ STORYBOARD_USER_PROMPT = """请根据以下剧本生成分镜脚本，以JSON数
 - duration: 整数秒数
 - prompt_img_start: 首帧图提示词（生成时留空）
 - prompt_img_end: 尾帧图提示词（生成时留空）
-- prompt_video: 视频提示词（视觉描述用英文；对白/旁白用中文原文，不要翻译）
+- prompt_video: 视频提示词
 - narration: 对白/旁白（中文原文）
 - img_start: 首帧图路径（生成时留空）
 - img_end: 尾帧图路径（生成时留空）

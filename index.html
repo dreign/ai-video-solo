@@ -3,13 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solo 视频生成工具</title>
+    <title>SOLO视频创意工坊</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- 国风字体 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <header class="app-header">
-        <h1>Solo 视频生成工具</h1>
+        <h1>SOLO视频创意工坊</h1>
         <nav class="tab-nav" id="tabNav">
             <button class="tab-btn active" data-tab="creative">创意</button>
             <button class="tab-btn" data-tab="script">剧本</button>
@@ -18,6 +22,7 @@
             <button class="tab-btn" data-tab="image-gen">生图</button>
             <button class="tab-btn" data-tab="video">视频</button>
             <button class="tab-btn tab-btn-settings" data-tab="settings">设置</button>
+            <button class="tab-btn tab-btn-theme" id="themeToggle" title="切换主题">🌙</button>
         </nav>
     </header>
 
@@ -346,9 +351,23 @@
     </main>
 
     <footer class="app-footer">
-        <span>Solo 视频生成工具 v1.0</span>
+        <div class="max-w-6xl mx-auto px-4 text-center space-y-2">
+        <p class="text-tungsten-500 text-xs"><strong>SOLO视频创意工坊 v1.0</strong></p>
+        <div class="flex justify-center gap-4 text-xs">
+            <a href="" target="_blank" rel="noopener noreferrer" style="color: #a1a1aa; text-decoration: none; transition: color 0.2s;">
+            沪ICP备2026011498号-2
+            </a>
+            <span class="text-tungsten-600">|</span>
+            <a href="mailto:fengbuxiu@foxmail.com" style="color: #a1a1aa; text-decoration: none; transition: color 0.2s;">
+            联系邮箱：fengbuxiu
+            </a>
+        </div>
+        <p class="text-tungsten-500 text-xs">
+            © 2026  <a href="" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300" style="color: #60a5fa; text-decoration: none; transition: color 0.2s;">
+            @和风
+            </a> VibeCoding
+        </p>
     </footer>
-
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-spinner"></div>
         <div class="loading-text">处理中...</div>
