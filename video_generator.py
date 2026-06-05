@@ -1,11 +1,14 @@
-"""ComfyUI 视频生成客户端"""
+"""视频生成客户端 - 支持 ComfyUI 和豆包 Seedance"""
 import json
 import os
 import shutil
 import time
 from pathlib import Path
 import requests
-from config import COMFYUI_HOST, COMFYUI_OUTPUT_DIR, VIDEO_WORKFLOW_PATH, IMAGE_Z_IMAGE_TURBO_WORKFLOW_PATH
+from config import (
+    COMFYUI_HOST, COMFYUI_OUTPUT_DIR, VIDEO_WORKFLOW_PATH, IMAGE_Z_IMAGE_TURBO_WORKFLOW_PATH,
+    VIDEO_ENGINE, ARK_API_KEY, ARK_VIDEO_MODEL, ARK_VIDEO_ENDPOINT
+)
 from logger import log_step, log_video_gen, log_api_call, log_api_full_io, log_error, log_debug, log_warn, log_info
 
 
@@ -170,7 +173,9 @@ def modify_video_workflow(workflow: dict, image_name: str, prompt: str, duration
     return modified
 
 
-def generate_video(
+# ============ 豆包 Seedance 视频生成 ============
+
+def generate_video_seedance(
     image_path: str,
     prompt: str,
     duration: int,
@@ -178,7 +183,7 @@ def generate_video(
     scene_id: str,
 ) -> str:
     """
-    生成视频
+    使用豆包 Seedance 模型生成视频
 
     Args:
         image_path: 首帧图片路径
@@ -191,7 +196,177 @@ def generate_video(
         生成的视频文件路径
     """
     t0 = time.time()
-    log_step("视频生成", "开始", f"scene_id={scene_id} | image={image_path} | duration={duration}s | prompt_len={len(prompt)}")
+    log_step("Seedance 视频生成", "开始", f"scene_id={scene_id} | image={image_path} | duration={duration}s")
+
+    # 读取图片并转为 base64
+    import base64
+    try:
+        with open(image_path, "rb") as f:
+            image_base64 = base64.b64encode(f.read()).decode("utf-8")
+    except Exception as e:
+        log_error("Seedance", f"读取图片失败: {str(e)}")
+        raise
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {ARK_API_KEY}",
+    }
+
+    # 构建请求体
+    body = {
+        "model": ARK_VIDEO_MODEL,
+        "prompt": prompt,
+        "image": f"data:image/png;base64,{image_base64}",
+        "ratio": "9:16" if "9:16" in prompt or "竖版" in prompt else "16:9",
+        "duration": duration,
+        "resolution": "1080p",
+        "watermark": False,
+    }
+
+    try:
+        response = requests.post(
+            ARK_VIDEO_ENDPOINT,
+            headers=headers,
+            json=body,
+            timeout=300,
+        )
+    except Exception as e:
+        log_error("Seedance", f"API 请求失败: {str(e)}")
+        raise
+
+    elapsed_api = time.time() - t0
+    log_api_call(
+        api_name="Seedance",
+        method="POST",
+        url=ARK_VIDEO_ENDPOINT,
+        status_code=response.status_code,
+        duration=elapsed_api,
+    )
+
+    if response.status_code != 200:
+        log_api_full_io(
+            api_name="Seedance",
+            method="POST",
+            url=ARK_VIDEO_ENDPOINT,
+            request_body=body,
+            response_body=response.text,
+            status_code=response.status_code,
+        )
+        log_error("Seedance", f"status={response.status_code}", response.text[:500])
+        raise Exception(f"视频生成 API 调用失败: {response.status_code} - {response.text}")
+
+    result = response.json()
+    log_api_full_io(
+        api_name="Seedance",
+        method="POST",
+        url=ARK_VIDEO_ENDPOINT,
+        request_body=body,
+        response_body=response.text,
+        status_code=response.status_code,
+    )
+
+    # 获取视频URL
+    video_url = result.get("data", {}).get("video_url", "")
+    if not video_url:
+        log_error("Seedance", "未获取到视频 URL", str(result))
+        raise Exception(f"未获取到视频 URL: {result}")
+
+    log_debug(f"获取到视频 URL: {video_url[:100]}...")
+
+    # 下载视频
+    try:
+        video_response = requests.get(video_url, timeout=120)
+    except Exception as e:
+        log_error("Seedance", f"视频下载失败: {str(e)}")
+        raise
+
+    if video_response.status_code == 200:
+        os.makedirs(output_dir, exist_ok=True)
+        dest_path = os.path.join(output_dir, f"scene_{scene_id}.mp4")
+        with open(dest_path, "wb") as f:
+            f.write(video_response.content)
+        elapsed_total = time.time() - t0
+        file_size = os.path.getsize(dest_path)
+        log_video_gen(
+            scene_id=scene_id,
+            image_path=image_path,
+            duration=duration,
+            prompt_id=result.get("id", "unknown"),
+        )
+        log_step("Seedance 视频生成", "完成", f"scene_id={scene_id} | output={dest_path} | size={file_size}bytes | elapsed={elapsed_total:.1f}s")
+        return dest_path
+
+    log_error("Seedance", f"视频下载失败: {video_response.status_code}")
+    raise Exception(f"视频下载失败: {video_response.status_code}")
+
+
+# ============ 统一的视频生成入口 ============
+
+def generate_video(
+    image_path: str,
+    prompt: str,
+    duration: int,
+    output_dir: str,
+    scene_id: str,
+) -> str:
+    """
+    根据配置的 VIDEO_ENGINE 选择视频生成方式
+
+    Args:
+        image_path: 首帧图片路径
+        prompt: 视频提示词
+        duration: 视频时长（秒）
+        output_dir: 输出目录
+        scene_id: 分镜ID
+
+    Returns:
+        生成的视频文件路径
+    """
+    if VIDEO_ENGINE == "doubao":
+        log_debug(f"使用豆包 Seedance 生成视频: scene_id={scene_id}")
+        return generate_video_seedance(
+            image_path=image_path,
+            prompt=prompt,
+            duration=duration,
+            output_dir=output_dir,
+            scene_id=scene_id,
+        )
+    else:
+        # 默认使用 ComfyUI
+        log_debug(f"使用 ComfyUI 生成视频: scene_id={scene_id}")
+        return generate_video_comfyui(
+            image_path=image_path,
+            prompt=prompt,
+            duration=duration,
+            output_dir=output_dir,
+            scene_id=scene_id,
+        )
+
+
+# ============ ComfyUI 视频生成 ============
+
+def generate_video_comfyui(
+    image_path: str,
+    prompt: str,
+    duration: int,
+    output_dir: str,
+    scene_id: str,
+) -> str:
+    """
+    使用 ComfyUI 生成视频
+
+    Args:
+        image_path: 首帧图片路径
+        prompt: 视频提示词
+        duration: 视频时长（秒）
+        output_dir: 输出目录
+        scene_id: 分镜ID
+
+    Returns:
+        生成的视频文件路径
+    """
+    t0 = time.time()
+    log_step("ComfyUI 视频生成", "开始", f"scene_id={scene_id} | image={image_path} | duration={duration}s | prompt_len={len(prompt)}")
 
     # 上传图片
     image_name = upload_image_to_comfyui(image_path)
@@ -216,7 +391,7 @@ def generate_video(
         shutil.copy2(latest_video, dest_path)
         elapsed = time.time() - t0
         file_size = os.path.getsize(dest_path)
-        log_step("视频生成", "完成", f"scene_id={scene_id} | output={dest_path} | size={file_size}bytes | elapsed={elapsed:.1f}s")
+        log_step("ComfyUI 视频生成", "完成", f"scene_id={scene_id} | output={dest_path} | size={file_size}bytes | elapsed={elapsed:.1f}s")
         return dest_path
 
     log_error("ComfyUI", "未找到生成的视频文件")

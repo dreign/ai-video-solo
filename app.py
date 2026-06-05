@@ -9,7 +9,7 @@ from flask_cors import CORS
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config import SOLO_DIR, PROJECTS_DIR, PROJECTS_INDEX, FLASK_HOST, FLASK_PORT, FLASK_DEBUG
+from config import SOLO_DIR, PROJECTS_DIR, PROJECTS_INDEX, FLASK_HOST, FLASK_PORT, FLASK_DEBUG, IMAGE_ENGINE
 from api_client import (
     generate_script,
     generate_storyboard,
@@ -23,6 +23,35 @@ from video_generator import generate_video, generate_image_via_comfyui
 from logger import (
     log_step, log_llm_call, log_api_call, log_error, log_warn, log_info, log_debug,
 )
+
+
+def generate_image_by_engine(prompt: str, aspect_ratio: str, output_dir: str, scene_id: str) -> str:
+    """
+    根据配置的 IMAGE_ENGINE 选择图片生成方式
+
+    Args:
+        prompt: 图片提示词
+        aspect_ratio: 画幅比例 "16:9" 或 "9:16"
+        output_dir: 输出目录
+        scene_id: 场景/角色ID
+
+    Returns:
+        生成的图片文件路径
+    """
+    output_path = os.path.join(output_dir, f"scene_{scene_id}.png")
+
+    if IMAGE_ENGINE == "comfyui":
+        log_debug(f"使用 ComfyUI 生成图片: scene_id={scene_id}")
+        return generate_image_via_comfyui(
+            prompt=prompt,
+            aspect_ratio=aspect_ratio,
+            output_dir=output_dir,
+            scene_id=scene_id,
+        )
+    else:
+        # 默认使用豆包 Seedream
+        log_debug(f"使用豆包 Seedream 生成图片: scene_id={scene_id}")
+        return generate_image_by_prompt(prompt=prompt, output_path=output_path)
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 CORS(app)
@@ -407,7 +436,7 @@ def api_generate_character_images():
 
         log_step("生成角色图", "执行", f"角色id={char_id} | name={char.get('name_cn', '?')}")
         try:
-            img_path = generate_image_via_comfyui(
+            img_path = generate_image_by_engine(
                 prompt=char["prompt"],
                 aspect_ratio=aspect_ratio,
                 output_dir=paths["character_img"],
@@ -479,6 +508,7 @@ def api_generate_storyboard_images():
 
     storyboard = read_json(paths["storyboard"])
     characters = read_json(paths["character"])
+    option = read_json(paths["option"], {"aspect_ratio": "16:9"})
 
     log_step("生成分镜首帧图", "开始", f"分镜数={len(storyboard)} | 角色数={len(characters)}")
 
@@ -515,7 +545,7 @@ def api_generate_storyboard_images():
         log_step("生成分镜首帧图", "执行", f"scene_id={scene_id} | 关联角色={name_list} | 参考图={reference_img or '无'}")
 
         try:
-            img_path = generate_image_via_comfyui(
+            img_path = generate_image_by_engine(
                 prompt=prompt_img,
                 aspect_ratio=option.get("aspect_ratio", "16:9"),
                 output_dir=paths["storyboard_img"],

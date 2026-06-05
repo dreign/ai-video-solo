@@ -52,11 +52,11 @@
     /* 主色 - 青绿 */
     --main-cyan: #397972;       /* 主青绿，生成按钮、选中Tab */
     --sub-cyan: #73B0A8;        /* 浅青绿，次要按钮、输入框聚焦 */
-    
+
     /* 点缀金 - 赭金 */
     --gold: #C99F58;            /* 哑光赭金、Hover、角标点缀 */
     --light-gold: #EBD9BC;      /* 浅泥金 */
-    
+
     /* 功能状态色 */
     --danger: #C2423C;          /* 危险红 */
     --danger-hover: #D4534D;
@@ -64,25 +64,107 @@
     --success-hover: #63AF79;
     --warn: #DD9E42;            /* 警示黄 */
     --warn-hover: #E8AF56;
-    
+
     /* 中性浅色 - 水墨宣纸 */
     --bg: #F8F5EF;              /* 宣纸全局底色 */
     --bg-card: #FFFFFF;         /* 面板/输入框白底卡片 */
     --bg-input: #FFFFFF;        /* 输入框底色 */
     --border: #D9E2E1;          /* 水墨浅灰边框、分割线 */
     --border-light: #E8EDEC;    /* 更浅边框 */
-    
+
     /* 深色文字 - 墨色 */
     --text: #2C3635;            /* 正文标题墨色 */
     --text-normal: #596665;     /* 辅助正文 */
     --text-dim: #92A1A0;        /* 占位提示文字 */
     --text-gold: #C99F58;       /* 赭金强调 */
-    
+
     /* 功能映射（兼容旧变量名） */
     --primary: var(--main-cyan);
     --primary-hover: var(--sub-cyan);
     --accent: var(--gold);
     --accent-hover: var(--light-gold);
+}
+
+/* ========== macOS 风格主题 ========== */
+:root.macos {
+    /* macOS 强调色 - 系统蓝 */
+    --main-cyan: #007AFF;       /* 系统蓝 */
+    --sub-cyan: #5AC8FA;        /* 浅蓝 */
+
+    /* 点缀色 */
+    --gold: #FF9500;            /* 橙色强调 */
+    --light-gold: #FFCC00;      /* 黄色 */
+
+    /* 功能状态色 - macOS 风格 */
+    --danger: #FF3B30;          /* 红色 */
+    --danger-hover: #FF6B64;
+    --success: #34C759;         /* 绿色 */
+    --success-hover: #6EE58A;
+    --warn: #FF9500;            /* 橙色 */
+    --warn-hover: #FFB340;
+
+    /* 中性色 - macOS 浅色模式 */
+    --bg: #F5F5F7;              /* 系统灰背景 */
+    --bg-card: #FFFFFF;         /* 纯白卡片 */
+    --bg-input: #FFFFFF;        /* 输入框 */
+    --border: #E5E5EA;          /* 边框灰 */
+    --border-light: #D1D1D6;    /* 浅边框 */
+
+    /* 文字 */
+    --text: #1C1C1E;            /* 主文字 */
+    --text-normal: #3A3A3C;     /* 次要文字 */
+    --text-dim: #8E8E93;        /* 占位文字 */
+    --text-gold: #007AFF;       /* 蓝色强调 */
+
+    /* 功能映射 */
+    --primary: var(--main-cyan);
+    --primary-hover: var(--sub-cyan);
+    --accent: var(--gold);
+    --accent-hover: var(--light-gold);
+
+    /* macOS 圆角 */
+    --radius: 10px;
+}
+
+/* macOS 深色模式 */
+:root.macos-dark {
+    /* macOS 深色强调色 */
+    --main-cyan: #0A84FF;       /* 系统蓝 */
+    --sub-cyan: #64D2FF;        /* 浅蓝 */
+
+    /* 点缀色 */
+    --gold: #FF9F0A;            /* 橙色 */
+    --light-gold: #FFD60A;      /* 黄色 */
+
+    /* 功能状态色 */
+    --danger: #FF453A;          /* 红色 */
+    --danger-hover: #FF6B64;
+    --success: #30D158;         /* 绿色 */
+    --success-hover: #6EE58A;
+    --warn: #FF9F0A;            /* 橙色 */
+    --warn-hover: #FFB340;
+
+    /* 中性色 - macOS 深色模式 */
+    --bg: #1C1C1E;              /* 深色背景 */
+    --bg-card: #2C2C2E;         /* 卡片背景 */
+    --bg-input: #3A3A3C;        /* 输入框 */
+    --border: #48484A;          /* 边框 */
+    --border-light: #636366;    /* 浅边框 */
+
+    /* 文字 */
+    --text: #FFFFFF;            /* 主文字 */
+    --text-normal: #EBEBF0;     /* 次要文字 */
+    --text-dim: #8E8E93;        /* 占位文字 */
+    --text-gold: #0A84FF;       /* 蓝色强调 */
+
+    /* 功能映射 */
+    --primary: var(--main-cyan);
+    --primary-hover: var(--sub-cyan);
+    --accent: var(--gold);
+    --accent-hover: var(--light-gold);
+
+    /* macOS 圆角 */
+    --radius: 10px;
 }
 
 body {
@@ -102,10 +184,86 @@ body {
 
 /* 浅色主题：宣纸纹理 */
 :root.light body {
-    background-image: 
+    background-image:
         radial-gradient(circle at 20% 80%, rgba(57, 121, 114, 0.04) 0%, transparent 50%),
         radial-gradient(circle at 80% 20%, rgba(57, 121, 114, 0.02) 0%, transparent 50%),
         radial-gradient(circle at 40% 40%, rgba(201, 159, 88, 0.02) 0%, transparent 30%);
+}
+
+/* macOS 主题背景 */
+:root.macos body,
+:root.macos-dark body {
+    background-image: none;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+}
+
+/* macOS 风格卡片效果 */
+:root.macos .panel-content,
+:root.macos-dark .panel-content {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.08);
+    border: none;
+}
+
+/* macOS 按钮风格 */
+:root.macos .btn,
+:root.macos-dark .btn {
+    border-radius: 8px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:root.macos .btn:active,
+:root.macos-dark .btn:active {
+    transform: scale(0.96);
+}
+
+/* macOS Tab 风格 */
+:root.macos .tab-btn,
+:root.macos-dark .tab-btn {
+    font-weight: 500;
+    letter-spacing: -0.01em;
+}
+
+:root.macos .tab-btn.active::after,
+:root.macos-dark .tab-btn.active::after {
+    height: 2px;
+    border-radius: 1px;
+}
+
+/* macOS 输入框 */
+:root.macos textarea,
+:root.macos input[type="text"],
+:root.macos input[type="password"],
+:root.macos-dark textarea,
+:root.macos-dark input[type="text"],
+:root.macos-dark input[type="password"] {
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    transition: all 0.2s ease;
+}
+
+:root.macos textarea:focus,
+:root.macos input[type="text"]:focus,
+:root.macos input[type="password"]:focus,
+:root.macos-dark textarea:focus,
+:root.macos-dark input[type="text"]:focus,
+:root.macos-dark input[type="password"]:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+    outline: none;
+}
+
+/* macOS 深色模式特定样式 */
+:root.macos-dark .panel-content {
+    background: rgba(44, 44, 46, 0.8);
+    backdrop-filter: blur(20px);
+}
+
+:root.macos-dark .app-header {
+    background: rgba(28, 28, 30, 0.8);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(72, 72, 74, 0.5);
 }
 
 /* ========== 头部 ========== */
@@ -1222,12 +1380,72 @@ textarea:focus {
     font-size: 1rem;
     padding: 12px 16px;
     transition: all 0.3s ease;
+    position: relative;
 }
 
 .tab-btn-theme:hover {
     color: var(--gold);
     background: rgba(212, 175, 80, 0.1);
-    transform: rotate(15deg);
+}
+
+/* 主题下拉菜单 */
+.theme-dropdown {
+    position: fixed;
+    top: 50px;
+    right: 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    padding: 8px;
+    min-width: 160px;
+    display: none;
+    z-index: 1000;
+}
+
+.theme-dropdown.show {
+    display: block;
+}
+
+.theme-option {
+    padding: 10px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text);
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.theme-option:hover {
+    background: var(--primary);
+    color: var(--text);
+}
+
+/* macOS 主题下拉菜单 */
+:root.macos .theme-dropdown,
+:root.macos-dark .theme-dropdown {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border: none;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    border-radius: 12px;
+    padding: 6px;
+}
+
+:root.macos-dark .theme-dropdown {
+    background: rgba(44, 44, 46, 0.95);
+}
+
+:root.macos .theme-option,
+:root.macos-dark .theme-option {
+    border-radius: 8px;
+    padding: 8px 12px;
+}
+
+:root.macos .theme-option:hover,
+:root.macos-dark .theme-option:hover {
+    background: var(--primary);
 }
 
 :root.light .tab-btn-settings:hover,

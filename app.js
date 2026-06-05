@@ -1267,28 +1267,60 @@ function showToast(message) {
 }
 
 // ============ 主题切换 ============
+const THEMES = ['default', 'light', 'macos', 'macos-dark'];
+const THEME_ICONS = {
+    'default': '🎋',
+    'light': '☀️',
+    'macos': '🍎',
+    'macos-dark': '🌑'
+};
+
 function initTheme() {
     const themeToggle = document.getElementById('themeToggle');
+    const themeDropdown = document.getElementById('themeDropdown');
     const root = document.documentElement;
 
     // 从localStorage读取主题设置
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'light') {
-        root.classList.add('light');
-        themeToggle.textContent = '☀️';
-    } else {
-        root.classList.remove('light');
-        themeToggle.textContent = '🌙';
+    const savedTheme = localStorage.getItem('theme') || 'default';
+    applyTheme(savedTheme);
+
+    // 切换下拉菜单显示
+    themeToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        themeDropdown.classList.toggle('show');
+    });
+
+    // 点击外部关闭下拉菜单
+    document.addEventListener('click', () => {
+        themeDropdown.classList.remove('show');
+    });
+
+    // 主题选项点击事件
+    document.querySelectorAll('.theme-option').forEach(option => {
+        option.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const theme = option.dataset.theme;
+            applyTheme(theme);
+            localStorage.setItem('theme', theme);
+            themeDropdown.classList.remove('show');
+        });
+    });
+}
+
+function applyTheme(theme) {
+    const root = document.documentElement;
+    const themeToggle = document.getElementById('themeToggle');
+
+    // 清除所有主题类
+    root.classList.remove('light', 'macos', 'macos-dark');
+
+    // 应用新主题
+    if (theme !== 'default') {
+        root.classList.add(theme);
     }
 
-    themeToggle.addEventListener('click', () => {
-        const isLight = root.classList.toggle('light');
-        themeToggle.textContent = isLight ? '☀️' : '🌙';
-        localStorage.setItem('theme', isLight ? 'light' : 'dark');
-        // 强制刷新创意页面数据以应用新主题
-        loadCreativeData();
-        loadProjectList();
-    });
+    // 更新按钮图标
+    themeToggle.textContent = THEME_ICONS[theme] || '🎨';
 }
 
 // ============ 初始化 ============

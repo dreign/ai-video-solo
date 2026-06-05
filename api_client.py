@@ -179,7 +179,7 @@ STORYBOARD_USER_PROMPT = """请根据以下剧本生成分镜脚本，以JSON数
 严格JSON数组，每个元素含：
 - group_id: 场景编号，如"001"
 - scene_id: 分镜编号，如"001"
-- desc: 分镜描述
+- desc: 分镜标题
 - duration: 整数秒数
 - prompt_img_start: 首帧图提示词（生成时留空）
 - prompt_img_end: 尾帧图提示词（生成时留空）
@@ -188,7 +188,7 @@ STORYBOARD_USER_PROMPT = """请根据以下剧本生成分镜脚本，以JSON数
 - img_start: 首帧图路径（生成时留空）
 - img_end: 尾帧图路径（生成时留空）
 - video: 视频路径（生成时留空）
-- name_en_list: 角色英文名数组，同一角色多年龄段用_young/_old后缀区分
+- name_en_list: 角色英文名数组，同一角色多年龄段用_young/_old后缀区分，无原生英文名用拼音+下划线命名。
 
 【注意事项】
 - group_id/scene_id 用3位数字，如"001"
@@ -240,7 +240,7 @@ IMG_PROMPT_USER = """【画幅比例】{aspect_ratio}
 【视频提示词】
 {prompt_video}
 
-请提取首帧静态视觉要素，生成同风格同画幅的英文绘图提示词。"""
+请提取首帧静态视觉要素，生成同风格同画幅的绘图提示词。"""
 
 
 def generate_img_prompt(prompt_video: str, aspect_ratio: str = "16:9") -> str:
