@@ -4,7 +4,7 @@ import os
 import time
 import requests as req
 from openai import OpenAI
-from config import TEXT_ENGINE, DEEPSEEK_API_KEY, DEEPSEEK_API_BASE, DEEPSEEK_MODEL, ARK_API_KEY, ARK_TEXT_MODEL, ARK_TEXT_ENDPOINT
+from config import TEXT_ENGINE, DEEPSEEK_API_KEY, DEEPSEEK_API_BASE, DEEPSEEK_MODEL, ARK_API_KEY, ARK_TEXT_MODEL, ARK_TEXT_ENDPOINT, AGNES_API_KEY, AGNES_API_BASE, AGNES_TEXT_MODEL
 from logger import log_llm_call, log_llm_response, log_llm_full_io, log_error, log_debug
 from prompt import (
     SCRIPT_SYSTEM_PROMPT_STORY,
@@ -20,11 +20,18 @@ client = OpenAI(
     base_url=DEEPSEEK_API_BASE,
 )
 
+agnes_client = OpenAI(
+    api_key=AGNES_API_KEY,
+    base_url=AGNES_API_BASE,
+)
+
 
 def _get_current_model() -> str:
     """获取当前使用的模型名"""
     if TEXT_ENGINE == "ark":
         return ARK_TEXT_MODEL
+    if TEXT_ENGINE == "agnes":
+        return AGNES_TEXT_MODEL
     return DEEPSEEK_MODEL
 
 
@@ -32,6 +39,8 @@ def call_deepseek(system_prompt: str, user_prompt: str, temperature: float = 0.7
     """调用 LLM API（根据 TEXT_ENGINE 自动选择引擎）"""
     if TEXT_ENGINE == "ark":
         return _call_ark_deepseek(system_prompt, user_prompt, temperature, purpose)
+    if TEXT_ENGINE == "agnes":
+        return _call_agnes(system_prompt, user_prompt, temperature, purpose)
     return _call_deepseek_direct(system_prompt, user_prompt, temperature, purpose)
 
 
@@ -137,6 +146,45 @@ def _call_ark_deepseek(system_prompt: str, user_prompt: str, temperature: float 
     return content
 
 
+def _call_agnes(system_prompt: str, user_prompt: str, temperature: float = 0.7, purpose: str = "chat") -> str:
+    """调用 Agnes AI API（OpenAI 兼容格式）"""
+    t0 = time.time()
+
+    try:
+        response = agnes_client.chat.completions.create(
+            model=AGNES_TEXT_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=temperature,
+            max_tokens=8192,
+        )
+    except Exception as e:
+        log_error("Agnes", str(e))
+        raise
+
+    elapsed = time.time() - t0
+    content = response.choices[0].message.content
+    usage = response.usage
+    log_llm_call(
+        model=AGNES_TEXT_MODEL,
+        purpose=purpose,
+        prompt_len=usage.prompt_tokens if usage else 0,
+        response_len=usage.completion_tokens if usage else len(content),
+        duration=elapsed,
+    )
+    log_llm_response(purpose, content)
+    log_llm_full_io(
+        purpose=purpose,
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        response=content,
+        model=AGNES_TEXT_MODEL,
+    )
+    return content
+
+
 # ============ 剧本生成相关 ============
 
 SCRIPT_OPTIONS = {
@@ -199,9 +247,10 @@ STORYBOARD_USER_PROMPT = """请根据以下剧本生成分镜脚本，以JSON数
 {script}"""
 
 
-def generate_storyboard(script: str, aspect_ratio: str = "16:9") -> str:
+def generate_storyboard(script: str, aspect_ratio: str = "16:9", art_style: str = "电影级超写实") -> str:
     """根据剧本和画幅比例生成分镜脚本"""
     system_prompt = STORYBOARD_SYSTEM_PROMPT.replace("{aspect_ratio}", aspect_ratio)
+    system_prompt = system_prompt.replace("{art_style}", art_style)
     user_prompt = STORYBOARD_USER_PROMPT.replace("{aspect_ratio}", aspect_ratio)
     user_prompt = user_prompt.replace("{script}", script)
     purpose = "生成分镜脚本"

@@ -502,6 +502,28 @@ textarea:focus {
     border-color: var(--primary-hover);
     transform: translateY(-2px);
 }
+.style-select-wrap {
+    width: 100%;
+}
+
+.style-select {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 0.9rem;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    cursor: pointer;
+    transition: border-color 0.3s;
+    appearance: auto;
+}
+
+.style-select:focus {
+    outline: none;
+    border-color: var(--primary);
+}
 
 .aspect-ratio-item:hover::after {
     width: 60%;
@@ -1076,6 +1098,415 @@ textarea:focus {
     font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
+/* ========== 角色库 ========== */
+.character-library-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+}
+
+.char-lib-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.char-lib-card:hover {
+    border-color: var(--border-light);
+    box-shadow: 0 4px 16px rgba(39, 89, 99, 0.1);
+}
+
+.char-lib-card .char-lib-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.char-lib-card .char-lib-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-gold);
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+}
+
+.char-lib-card .char-lib-name-en {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+.char-lib-card .char-lib-desc {
+    font-size: 0.82rem;
+    color: var(--text);
+    background: var(--bg);
+    padding: 6px 8px;
+    border-radius: 4px;
+    line-height: 1.5;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+}
+
+.char-lib-card .char-lib-prompt {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    max-height: 80px;
+    overflow-y: auto;
+    background: var(--bg-input);
+    padding: 6px 8px;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    line-height: 1.5;
+}
+
+.char-lib-card .char-lib-img {
+    width: 100%;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    transition: all 0.3s ease;
+}
+
+.char-lib-card .char-lib-img:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 12px rgba(212, 175, 80, 0.2);
+}
+
+.char-lib-card .char-lib-img-placeholder {
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: var(--bg);
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+}
+
+.char-lib-card .char-lib-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.char-lib-card .char-lib-actions .btn {
+    font-size: 0.78rem;
+    padding: 4px 10px;
+}
+
+/* 角色库编辑弹窗 */
+.char-lib-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+    animation: fadeIn 0.2s ease;
+}
+
+.char-lib-dialog {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    width: 90%;
+    max-width: 550px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    animation: slideUp 0.25s ease;
+}
+
+.char-lib-dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.char-lib-dialog-header h2 {
+    margin: 0;
+    font-size: 1.15rem;
+    color: var(--text);
+    font-weight: 600;
+}
+
+.char-lib-dialog-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.char-lib-dialog-close:hover {
+    color: var(--danger);
+}
+
+.char-lib-dialog-body {
+    padding: 16px 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.char-lib-dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+}
+
+.btn-cancel {
+    background: var(--bg);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+}
+
+.btn-cancel:hover {
+    background: var(--border-light);
+    color: var(--text);
+}
+
+.btn-danger {
+    background: var(--danger);
+    color: white;
+    border: 1px solid var(--danger);
+}
+
+.btn-danger:hover {
+    background: var(--danger-hover);
+}
+
+/* ========== 绘图风格 ========== */
+
+.prompt-template-wrap {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.prompt-template-wrap .prompt-template {
+    flex: 1;
+    min-height: 120px;
+    resize: vertical;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.prompt-template-wrap .btn {
+    flex-shrink: 0;
+    margin-top: 4px;
+}
+
+.style-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.style-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.style-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 4px 16px rgba(212, 175, 80, 0.15);
+    transform: translateY(-2px);
+}
+
+.style-card-img {
+    width: 100%;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.style-card-real-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.style-card-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.style-card-img-label {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    padding: 4px 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    text-align: center;
+    max-width: 90%;
+    word-break: break-all;
+}
+
+.style-card-actions {
+    padding: 0 10px 10px;
+    display: flex;
+    gap: 6px;
+}
+
+.style-card-actions .btn {
+    font-size: 0.78rem;
+    padding: 4px 10px;
+}
+
+/* 引擎子 Tab */
+.engine-sub-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.engine-sub-tabs .sub-tab {
+    padding: 8px 20px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    transition: all 0.2s ease;
+    margin-bottom: -1px;
+}
+
+.engine-sub-tabs .sub-tab:hover {
+    color: var(--text);
+    background: rgba(39, 89, 99, 0.06);
+}
+
+.engine-sub-tabs .sub-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+}
+
+.btn-generate-all {
+    margin-left: auto;
+    font-size: 0.82rem;
+    padding: 6px 16px;
+    border-radius: var(--radius);
+}
+
+/* 大图预览遮罩 */
+.large-image-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.2s ease;
+}
+
+.large-image-overlay.show {
+    display: flex;
+}
+
+.large-image-overlay img {
+    max-width: 90vw;
+    max-height: 90vh;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+    animation: zoomIn 0.25s ease;
+}
+
+.large-image-close {
+    position: absolute;
+    top: 16px;
+    right: 24px;
+    background: rgba(0, 0, 0, 0.5);
+    border: none;
+    color: white;
+    font-size: 2rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    line-height: 1;
+}
+
+.large-image-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+@keyframes zoomIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.style-card-name {
+    padding: 8px 10px 2px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+}
+
+.style-card-desc {
+    padding: 0 10px 10px;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+}
+
 /* ========== 视频页面 - 新布局 ========== */
 .video-panel {
     display: flex;
@@ -1462,6 +1893,13 @@ textarea:focus {
 .settings-section:last-of-type {
     border-bottom: none;
     margin-bottom: 12px;
+}
+
+.settings-hint {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    margin: 4px 0 0 0;
+    padding: 6px 0;
 }
 
 .settings-title {
@@ -1923,4 +2361,256 @@ input[type="password"]::placeholder {
         width: 120px;
         height: 68px;
     }
+}
+
+/* ========== 当前项目状态条 ========== */
+.current-project-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    margin: 12px 0;
+    background: linear-gradient(135deg, rgba(143, 188, 187, 0.1), rgba(193, 154, 91, 0.08));
+    border: 1px solid rgba(143, 188, 187, 0.3);
+    border-radius: 6px;
+    font-size: 0.88rem;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    flex-wrap: wrap;
+}
+
+.current-project-label {
+    color: var(--text-dim);
+    font-weight: 500;
+}
+
+.current-project-name {
+    color: var(--text);
+    font-weight: 600;
+    padding: 2px 10px;
+    background: rgba(143, 188, 187, 0.2);
+    border-radius: 4px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 100px;
+}
+
+.current-project-name.empty {
+    color: var(--text-dim);
+    font-weight: 400;
+    font-style: italic;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.current-project-name.active {
+    color: var(--primary);
+    background: rgba(143, 188, 187, 0.25);
+    border: 1px solid rgba(143, 188, 187, 0.4);
+}
+
+.current-project-mode {
+    font-size: 0.78rem;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-weight: 500;
+}
+
+.current-project-mode.mode-new {
+    color: #d4a85f;
+    background: rgba(212, 168, 95, 0.15);
+    border: 1px solid rgba(212, 168, 95, 0.3);
+}
+
+.current-project-mode.mode-edit {
+    color: #5fb394;
+    background: rgba(95, 179, 148, 0.15);
+    border: 1px solid rgba(95, 179, 148, 0.3);
+}
+
+/* ========== 创意输入工具栏 ========== */
+.creative-input-toolbar {
+    margin-bottom: 8px;
+    display: flex;
+    gap: 8px;
+}
+
+.btn-poem {
+    background: linear-gradient(135deg, rgba(193, 154, 91, 0.15), rgba(143, 188, 187, 0.15));
+    border: 1px solid rgba(193, 154, 91, 0.5);
+    color: var(--text);
+    padding: 6px 14px;
+    font-size: 0.82rem;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-poem:hover {
+    background: linear-gradient(135deg, rgba(193, 154, 91, 0.3), rgba(143, 188, 187, 0.3));
+    border-color: var(--primary);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(193, 154, 91, 0.25);
+}
+
+/* ========== 诗词库弹窗 ========== */
+.poem-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.poem-dialog {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    width: 90%;
+    max-width: 720px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    animation: slideUp 0.25s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.poem-dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.poem-dialog-header h2 {
+    margin: 0;
+    font-size: 1.15rem;
+    color: var(--text);
+    font-weight: 600;
+}
+
+.poem-dialog-close {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-size: 1.6rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 6px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.poem-dialog-close:hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.poem-search-bar {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.poem-search-bar input {
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 0.88rem;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    box-sizing: border-box;
+}
+
+.poem-search-bar input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(143, 188, 187, 0.2);
+}
+
+.poem-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 20px 20px;
+}
+
+.poem-item {
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.poem-item:hover {
+    border-color: var(--primary);
+    background: rgba(143, 188, 187, 0.08);
+    transform: translateX(2px);
+}
+
+.poem-item-title {
+    font-size: 0.98rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+    font-family: "Noto Serif SC", "Microsoft YaHei", serif;
+}
+
+.poem-item-meta {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+}
+
+.poem-item-content {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+    font-family: "Noto Serif SC", "Microsoft YaHei", serif;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: pre-wrap;
+}
+
+.poem-item-score {
+    display: inline-block;
+    background: linear-gradient(135deg, rgba(193, 154, 91, 0.2), rgba(143, 188, 187, 0.2));
+    color: var(--text);
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 0.72rem;
+    margin-left: 6px;
+    border: 1px solid rgba(193, 154, 91, 0.3);
 }

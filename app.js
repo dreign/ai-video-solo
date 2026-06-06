@@ -119,6 +119,307 @@ document.getElementById("tabNav").addEventListener("click", (e) => {
     }
 });
 
+// ============ 角色库 ============
+
+function renderCharacterLibraryList(characters) {
+    const container = document.getElementById("characterLibraryList");
+    if (!characters || characters.length === 0) {
+        container.innerHTML = '<p class="empty-hint">暂无角色库数据，请新增或从项目导入</p>';
+        return;
+    }
+
+    let html = "";
+    characters.forEach((char) => {
+        const imgSrc = char.img ? `${char.img}?t=${Date.now()}` : "";
+        html += `
+        <div class="char-lib-card" data-id="${char.id}">
+            <div class="char-lib-header">
+                <span class="char-lib-name">${char.name_cn || ""}</span>
+                <span class="char-lib-name-en">${char.name_en || ""}</span>
+            </div>
+            ${char.description ? `<div class="char-lib-desc">${escapeHtml(char.description)}</div>` : ""}
+            <div class="char-lib-prompt">${char.prompt ? escapeHtml(char.prompt).slice(0, 200) + (char.prompt.length > 200 ? "..." : "") : "无提示词"}</div>
+            ${imgSrc
+                ? `<img class="char-lib-img" src="${imgSrc}" alt="${char.name_cn}" onmouseenter="showImagePreview(this.src)" onmouseleave="hideImagePreview()">`
+                : '<div class="char-lib-img-placeholder">角色图未生成</div>'}
+            <div class="char-lib-actions">
+                <button class="btn btn-small btn-accent" onclick="charLibGenerateImage('${char.id}')">生成图</button>
+                <button class="btn btn-small btn-primary" onclick="charLibEdit('${char.id}')">编辑</button>
+                <button class="btn btn-small btn-danger" onclick="charLibDelete('${char.id}')">删除</button>
+            </div>
+        </div>`;
+    });
+    container.innerHTML = html;
+}
+
+async function loadCharacterLibraryData() {
+    try {
+        const data = await apiFetch("/api/character-library/list");
+        const chars = data.characters || [];
+        await convertCharacterMediaUrls(chars);
+        renderCharacterLibraryList(chars);
+    } catch (e) {
+        console.error("加载角色库失败:", e);
+        showStatus("characterLibraryStatus", "加载角色库失败", "error");
+    }
+}
+
+function openCharLibDialog(char) {
+    document.getElementById("charLibEditId").value = char ? char.id : "";
+    document.getElementById("charLibNameCn").value = char ? (char.name_cn || "") : "";
+    document.getElementById("charLibNameEn").value = char ? (char.name_en || "") : "";
+    document.getElementById("charLibDescription").value = char ? (char.description || "") : "";
+    document.getElementById("charLibPrompt").value = char ? (char.prompt || "") : "";
+    document.getElementById("charLibDialogTitle").textContent = char ? "编辑角色" : "新增角色";
+    document.getElementById("charLibDialogOverlay").style.display = "flex";
+}
+
+function closeCharLibDialog() {
+    document.getElementById("charLibDialogOverlay").style.display = "none";
+}
+
+async function charLibSave() {
+    const id = document.getElementById("charLibEditId").value;
+    const nameCn = document.getElementById("charLibNameCn").value.trim();
+    if (!nameCn) {
+        showStatus("characterLibraryStatus", "角色名称不能为空", "error");
+        return;
+    }
+
+    const result = await apiFetch("/api/character-library/save", {
+        method: "POST",
+        body: JSON.stringify({
+            id: id,
+            name_cn: nameCn,
+            name_en: document.getElementById("charLibNameEn").value.trim(),
+            description: document.getElementById("charLibDescription").value.trim(),
+            prompt: document.getElementById("charLibPrompt").value.trim(),
+        }),
+    });
+
+    if (result.success) {
+        closeCharLibDialog();
+        await loadCharacterLibraryData();
+        showStatus("characterLibraryStatus", "角色已保存", "success");
+    } else {
+        showStatus("characterLibraryStatus", result.error || "保存失败", "error");
+    }
+}
+
+function charLibEdit(charId) {
+    // 从当前列表中找到角色数据
+    const cards = document.querySelectorAll(".char-lib-card");
+    for (const card of cards) {
+        if (card.dataset.id === charId) {
+            const nameEl = card.querySelector(".char-lib-name");
+            const nameEnEl = card.querySelector(".char-lib-name-en");
+            const descEl = card.querySelector(".char-lib-desc");
+            const promptEl = card.querySelector(".char-lib-prompt");
+            openCharLibDialog({
+                id: charId,
+                name_cn: nameEl ? nameEl.textContent : "",
+                name_en: nameEnEl ? nameEnEl.textContent : "",
+                description: descEl ? descEl.textContent : "",
+                prompt: promptEl ? promptEl.textContent.replace(/\.\.\.$/, "") : "",
+            });
+            return;
+        }
+    }
+    // 回退：从 API 加载
+    apiFetch("/api/character-library/list").then(data => {
+        const chars = data.characters || [];
+        const char = chars.find(c => c.id === charId);
+        if (char) openCharLibDialog(char);
+        else showStatus("characterLibraryStatus", "角色不存在", "error");
+    });
+}
+
+async function charLibDelete(charId) {
+    if (!confirm("确定要删除该角色吗？")) return;
+    const result = await apiFetch("/api/character-library/delete", {
+        method: "POST",
+        body: JSON.stringify({ id: charId }),
+    });
+    if (result.success) {
+        await loadCharacterLibraryData();
+        showStatus("characterLibraryStatus", "角色已删除", "success");
+    } else {
+        showStatus("characterLibraryStatus", result.error || "删除失败", "error");
+    }
+}
+
+async function charLibGenerateImage(charId) {
+    showStatus("characterLibraryStatus", "正在生成角色图...", "loading");
+    const result = await apiFetch("/api/character-library/generate-image", {
+        method: "POST",
+        body: JSON.stringify({ id: charId }),
+    });
+    if (result.success) {
+        await loadCharacterLibraryData();
+        showStatus("characterLibraryStatus", "角色图生成完成", "success");
+    } else {
+        showStatus("characterLibraryStatus", result.error || "生成失败", "error");
+    }
+}
+
+// 角色库事件绑定
+document.getElementById("btnCharLibAdd").addEventListener("click", () => openCharLibDialog(null));
+document.getElementById("btnCharLibDialogClose").addEventListener("click", closeCharLibDialog);
+document.getElementById("btnCharLibDialogCancel").addEventListener("click", closeCharLibDialog);
+document.getElementById("charLibDialogOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "charLibDialogOverlay") closeCharLibDialog();
+});
+document.getElementById("btnCharLibDialogSave").addEventListener("click", charLibSave);
+
+document.getElementById("btnCharLibImport").addEventListener("click", async () => {
+    showStatus("characterLibraryStatus", "正在导入角色...", "loading");
+    const result = await apiFetch("/api/character-library/import-project", { method: "POST" });
+    if (result.success) {
+        await loadCharacterLibraryData();
+        showStatus("characterLibraryStatus", `成功导入 ${result.imported} 个角色`, "success");
+    } else {
+        showStatus("characterLibraryStatus", result.error || "导入失败", "error");
+    }
+});
+
+// ============ 绘图风格 ============
+
+
+
+let currentStyleEngine = "agnes";
+let currentStyles = [];
+
+function switchStyleEngine(engine) {
+    currentStyleEngine = engine;
+    document.querySelectorAll("#styleEngineTabs .sub-tab").forEach(tab => {
+        tab.classList.toggle("active", tab.dataset.engine === engine);
+    });
+    loadDrawingStyleData();
+}
+
+function loadDrawingStyleData() {
+    apiFetch(`/api/drawing-style/list?engine=${currentStyleEngine}`).then(data => {
+        currentStyles = data.styles || [];
+        renderStyleGallery(currentStyles);
+    }).catch(e => {
+        console.error("加载绘图风格失败:", e);
+    });
+}
+
+function renderStyleGallery(styles) {
+    const container = document.getElementById("styleGallery");
+    if (!container || !styles) return;
+
+    let html = "";
+    styles.forEach((style) => {
+        const hasImg = style.img && style.img.trim() !== "";
+        const imgSrc = hasImg ? `${style.img}?t=${Date.now()}` : "";
+        html += `
+        <div class="style-card" data-style-en="${style.en}" data-style-name="${style.name}">
+            <div class="style-card-img" id="styleImg-${style.en}">
+                <img class="style-card-real-img" id="styleRealImg-${style.en}" src="${imgSrc}"
+                     onload="this.style.display='';document.getElementById('stylePlaceholder-${style.en}').style.display='none'"
+                     onerror="this.style.display='none';document.getElementById('stylePlaceholder-${style.en}').style.display='flex'"
+                     onclick="showLargeImage(this.src)"
+                     style="${hasImg ? '' : 'display:none;'}cursor:pointer">
+                <div class="style-card-placeholder" id="stylePlaceholder-${style.en}" style="background: linear-gradient(135deg, hsl(${Math.floor(Math.random() * 360)}, 70%, 60%), hsl(${Math.floor(Math.random() * 360)}, 60%, 40%));${hasImg ? 'display:none' : 'display:flex'};">
+                    <span class="style-card-img-label">${style.en.replace(/_/g, " ")}</span>
+                </div>
+            </div>
+            <div class="style-card-name">${style.name}</div>
+            <div class="style-card-desc">${style.desc}</div>
+            <div class="style-card-actions">
+                <button class="btn btn-small btn-accent" onclick="generateStyleSample('${style.en}','${style.name}')">生成示例图</button>
+            </div>
+        </div>`;
+    });
+    container.innerHTML = html;
+}
+
+function populateArtStyleDropdown() {
+    apiFetch("/api/drawing-style/list?engine=agnes").then(data => {
+        const select = document.getElementById("creativeArtStyle");
+        if (!select) return;
+        const currentVal = select.value;
+        select.innerHTML = data.styles.map(s => `<option value="${s.name}">${s.name}</option>`).join("");
+        // 恢复选中值
+        if (currentVal) select.value = currentVal;
+    }).catch(() => {});
+}
+
+async function generateStyleSample(styleEn, styleName) {
+    const engine = currentStyleEngine;
+    showStatus("characterLibraryStatus", `正在生成 ${styleName} 示例图（${engine}）...`, "loading");
+    try {
+        const result = await apiFetch("/api/drawing-style/generate", {
+            method: "POST",
+            body: JSON.stringify({ style_en: styleEn, style_name: styleName, engine: engine }),
+        });
+        if (result.success) {
+            await loadDrawingStyleData();
+            showStatus("characterLibraryStatus", `${styleName} 示例图生成完成`, "success");
+        } else {
+            showStatus("characterLibraryStatus", result.error || "生成失败", "error");
+        }
+    } catch (e) {
+        showStatus("characterLibraryStatus", e.message || "生成失败", "error");
+    }
+}
+
+async function generateAllStyles() {
+    const engine = currentStyleEngine;
+    if (!currentStyles.length) return;
+    if (!confirm(`将为 ${engine} 引擎生成 ${currentStyles.length} 种风格的示例图，继续吗？`)) return;
+
+    showStatus("characterLibraryStatus", `正在批量生成（共 ${currentStyles.length} 张）...`, "loading");
+    let success = 0, fail = 0;
+    for (let i = 0; i < currentStyles.length; i++) {
+        const style = currentStyles[i];
+        try {
+            showStatus("characterLibraryStatus", `正在生成 [${i + 1}/${currentStyles.length}] ${style.name}...`, "loading");
+            const result = await apiFetch("/api/drawing-style/generate", {
+                method: "POST",
+                body: JSON.stringify({ style_en: style.en, style_name: style.name, engine: engine }),
+            });
+            if (result.success) success++;
+            else fail++;
+        } catch (e) {
+            fail++;
+        }
+    }
+    await loadDrawingStyleData();
+    showStatus("characterLibraryStatus", `批量生成完成：成功 ${success} 张，失败 ${fail} 张`, fail > 0 ? "error" : "success");
+}
+
+async function syncStyleImages() {
+    showStatus("characterLibraryStatus", "正在同步图片路径...", "loading");
+    try {
+        const result = await apiFetch("/api/drawing-style/sync", { method: "POST" });
+        if (result.success) {
+            const parts = Object.entries(result.results).map(([k, v]) => `${k}:${v.with_img}/${v.total}`);
+            await loadDrawingStyleData();
+            showStatus("characterLibraryStatus", `同步完成：${parts.join(" | ")}`, "success");
+        } else {
+            showStatus("characterLibraryStatus", result.error || "同步失败", "error");
+        }
+    } catch (e) {
+        showStatus("characterLibraryStatus", e.message || "同步失败", "error");
+    }
+}
+
+function copyTemplate(elementId) {
+    const textarea = document.getElementById(elementId);
+    if (!textarea) return;
+    textarea.select();
+    navigator.clipboard.writeText(textarea.value).then(() => {
+        showToast("提示词模版已复制");
+    }).catch(() => {
+        // 降级方案
+        document.execCommand("copy");
+        showToast("提示词模版已复制");
+    });
+}
+
 // 画幅比例选择器交互
 document.getElementById("aspectRatioGroup").addEventListener("click", (e) => {
     const item = e.target.closest(".aspect-ratio-item");
@@ -153,16 +454,26 @@ async function loadTabData(tabName) {
         case "settings":
             await loadSettingsData();
             break;
+        case "character-library":
+            await loadCharacterLibraryData();
+            break;
+        case "drawing-style":
+            loadDrawingStyleData();
+            break;
     }
 }
 
 // ============ 项目管理 ============
 let currentProjectId = null;
 
+// 项目缓存（用于获取项目名称）
+let projectCache = [];
+
 async function loadProjectList() {
     try {
         const data = await apiFetch("/api/projects/list");
         currentProjectId = data.current_id;
+        projectCache = data.projects || [];
         renderProjectList(data.projects, data.current_id);
         updateProjectInfo();
     } catch (e) {
@@ -192,13 +503,26 @@ function renderProjectList(projects, currentId) {
 }
 
 function updateProjectInfo() {
-    const infoEl = document.getElementById("projectInfo");
-    const idEl = document.getElementById("currentProjectId");
+    const nameEl = document.getElementById("currentProjectName");
+    const modeEl = document.getElementById("currentProjectMode");
+
     if (currentProjectId) {
-        infoEl.style.display = "";
-        idEl.textContent = currentProjectId;
+        // 查找当前项目的名称
+        const project = projectCache.find((p) => p.id === currentProjectId);
+        const projectName = project ? (project.creative_preview || project.name || currentProjectId) : currentProjectId;
+        nameEl.textContent = projectName;
+        nameEl.classList.remove("empty");
+        nameEl.classList.add("active");
+        modeEl.textContent = "(编辑模式)";
+        modeEl.classList.remove("mode-new");
+        modeEl.classList.add("mode-edit");
     } else {
-        infoEl.style.display = "none";
+        nameEl.textContent = "无";
+        nameEl.classList.add("empty");
+        nameEl.classList.remove("active");
+        modeEl.textContent = "(新建项目模式)";
+        modeEl.classList.add("mode-new");
+        modeEl.classList.remove("mode-edit");
     }
 }
 
@@ -241,6 +565,105 @@ document.getElementById("btnNewProject").addEventListener("click", () => {
     }
     currentProjectId = null;
     updateProjectInfo();
+});
+
+// ============ 诗词库选择弹窗 ============
+let poemCache = [];
+
+function renderPoemList(poems) {
+    const listEl = document.getElementById("poemList");
+    if (!poems || poems.length === 0) {
+        listEl.innerHTML = '<p class="empty-hint">未找到匹配的诗词</p>';
+        return;
+    }
+    listEl.innerHTML = poems.map((p) => {
+        const content = (p.content || "").replace(/</g, "&lt;");
+        return `
+            <div class="poem-item" data-index="${p.index}">
+                <div class="poem-item-title">${p.title}<span class="poem-item-score">${p.fame_score || ""}</span></div>
+                <div class="poem-item-meta">${p.dynasty || ""} · ${p.author || ""}</div>
+                <div class="poem-item-content">${content}</div>
+            </div>
+        `;
+    }).join("");
+
+    // 绑定点击事件
+    listEl.querySelectorAll(".poem-item").forEach((item) => {
+        item.addEventListener("click", () => {
+            const idx = parseInt(item.getAttribute("data-index"), 10);
+            const poem = poemCache.find((p) => p.index === idx);
+            if (poem) {
+                selectPoem(poem);
+            }
+        });
+    });
+}
+
+function selectPoem(poem) {
+    // 整理诗词全字段，作为剧本写作资源
+    let text = `【诗词标题】${poem.title || ""}\n`;
+    text += `【作者】${poem.author || ""}（${poem.dynasty || ""}）\n`;
+    if (poem.author_intro) text += `【作者简介】${poem.author_intro}\n`;
+    if (poem.writing_background) text += `【写作背景】${poem.writing_background}\n`;
+    if (poem.translation) text += `【白话译文】${poem.translation}\n`;
+    if (poem.theme) text += `【主旨情感】${poem.theme}\n`;
+    if (poem.appreciation) text += `【艺术赏析】${poem.appreciation}\n`;
+    document.getElementById("creativeInput").value = text;
+    closePoemDialog();
+    showStatus("creativeStatus", `已选择诗词《${poem.title}》，请继续创作`, "success");
+}
+
+function openPoemDialog() {
+    const overlay = document.getElementById("poemDialogOverlay");
+    overlay.style.display = "flex";
+    document.getElementById("poemSearchInput").value = "";
+
+    if (poemCache.length === 0) {
+        apiFetch("/api/poems/list").then((data) => {
+            poemCache = data.poems || [];
+            renderPoemList(poemCache);
+        }).catch((e) => {
+            console.error("加载诗词库失败:", e);
+            document.getElementById("poemList").innerHTML = '<p class="empty-hint">诗词库加载失败</p>';
+        });
+    } else {
+        renderPoemList(poemCache);
+    }
+
+    setTimeout(() => {
+        document.getElementById("poemSearchInput").focus();
+    }, 100);
+}
+
+function closePoemDialog() {
+    document.getElementById("poemDialogOverlay").style.display = "none";
+}
+
+document.getElementById("btnOpenPoemDialog").addEventListener("click", openPoemDialog);
+document.getElementById("btnClosePoemDialog").addEventListener("click", closePoemDialog);
+document.getElementById("poemDialogOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "poemDialogOverlay") closePoemDialog();
+});
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+        const overlay = document.getElementById("poemDialogOverlay");
+        if (overlay.style.display === "flex") closePoemDialog();
+    }
+});
+
+document.getElementById("poemSearchInput").addEventListener("input", (e) => {
+    const keyword = e.target.value.trim().toLowerCase();
+    if (!keyword) {
+        renderPoemList(poemCache);
+        return;
+    }
+    const filtered = poemCache.filter((p) => {
+        return (p.title && p.title.toLowerCase().includes(keyword)) ||
+               (p.author && p.author.toLowerCase().includes(keyword)) ||
+               (p.dynasty && p.dynasty.toLowerCase().includes(keyword)) ||
+               (p.content && p.content.toLowerCase().includes(keyword));
+    });
+    renderPoemList(filtered);
 });
 
 // 确保有当前项目的辅助函数
@@ -291,6 +714,10 @@ async function loadCreativeData() {
                 arRadio.closest(".aspect-ratio-item").classList.add("active");
             }
         }
+        // 恢复绘图风格
+        if (data.option && data.option.art_style) {
+            document.getElementById("creativeArtStyle").value = data.option.art_style;
+        }
     } catch (e) {
         console.error("加载创意数据失败:", e);
     }
@@ -314,11 +741,12 @@ document.getElementById("btnSaveCreative").addEventListener("click", async () =>
 
     const optionId = document.querySelector('input[name="scriptOption"]:checked').value;
     const aspectRatio = getAspectRatio();
+    const artStyle = document.getElementById("creativeArtStyle").value;
 
     showStatus("creativeStatus", "正在保存创意...", "loading");
     const result = await apiFetch("/api/creative/save", {
         method: "POST",
-        body: JSON.stringify({ creative, option_id: optionId, aspect_ratio: aspectRatio }),
+        body: JSON.stringify({ creative, option_id: optionId, aspect_ratio: aspectRatio, art_style: artStyle }),
     });
 
     if (result.success) {
@@ -346,12 +774,13 @@ document.getElementById("btnGenerateScript").addEventListener("click", async () 
 
     const optionId = document.querySelector('input[name="scriptOption"]:checked').value;
     const aspectRatio = getAspectRatio();
+    const artStyle = document.getElementById("creativeArtStyle").value;
 
     // 先保存创意
     showStatus("creativeStatus", "正在保存创意并生成剧本...", "loading");
     await apiFetch("/api/creative/save", {
         method: "POST",
-        body: JSON.stringify({ creative, option_id: optionId, aspect_ratio: aspectRatio }),
+        body: JSON.stringify({ creative, option_id: optionId, aspect_ratio: aspectRatio, art_style: artStyle }),
     });
 
     // 生成剧本
@@ -1085,6 +1514,33 @@ function hideImagePreview() {
     }, 100);
 }
 
+// ============ 大图预览 ============
+
+function showLargeImage(src) {
+    let overlay = document.getElementById("largeImageOverlay");
+    if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.id = "largeImageOverlay";
+        overlay.className = "large-image-overlay";
+        overlay.innerHTML = '<img src="" alt="大图预览"><button class="large-image-close" onclick="hideLargeImage()">×</button>';
+        overlay.addEventListener("click", (e) => {
+            if (e.target === overlay || e.target.tagName === 'IMG') hideLargeImage();
+        });
+        document.body.appendChild(overlay);
+    }
+    overlay.querySelector("img").src = src;
+    overlay.classList.add("show");
+    document.body.style.overflow = "hidden";
+}
+
+function hideLargeImage() {
+    const overlay = document.getElementById("largeImageOverlay");
+    if (overlay) {
+        overlay.classList.remove("show");
+        document.body.style.overflow = "";
+    }
+}
+
 // ============ 设置页面 ============
 
 // ---- 引擎切换逻辑 ----
@@ -1093,18 +1549,21 @@ function initEngineToggles() {
         toggle.addEventListener('change', (e) => {
             const radio = e.target;
             if (radio.type !== 'radio') return;
-            const engine = radio.value;
-            const container = toggle.closest('.settings-section');
+            const value = radio.value;
+            const container = toggle.closest('.settings-section') || toggle.closest('.form-group');
 
             // 更新 toggle 按钮 active 状态
             toggle.querySelectorAll('.engine-option').forEach(opt => {
-                opt.classList.toggle('active', opt.dataset.engine === engine);
+                const match = opt.dataset.engine === value || opt.dataset.mode === value;
+                opt.classList.toggle('active', match);
             });
 
-            // 切换引擎字段显示
-            container.querySelectorAll('.engine-fields').forEach(fields => {
-                fields.style.display = fields.dataset.engine === engine ? 'block' : 'none';
-            });
+            // 切换引擎字段显示（仅对引擎 toggle 生效）
+            if (container) {
+                container.querySelectorAll('.engine-fields').forEach(fields => {
+                    fields.style.display = fields.dataset.engine === value ? 'block' : 'none';
+                });
+            }
         });
     });
 }
@@ -1116,7 +1575,7 @@ async function loadSettingsData() {
         const s = data.settings;
 
         // 文本处理 - 引擎
-        const txtEngine = s.text_engine || "deepseek";
+        const txtEngine = s.text_engine || "agnes";
         const txtRadio = document.querySelector('input[name="textEngine"][value="' + txtEngine + '"]');
         if (txtRadio) txtRadio.checked = true;
         const txtToggle = document.getElementById("textEngineToggle");
@@ -1134,9 +1593,12 @@ async function loadSettingsData() {
         document.getElementById("settingsDeepseekModel").value = s.deepseek_model || "";
         document.getElementById("settingsArkTextModel").value = s.ark_text_model || "deepseek-v4-flash-260425";
         document.getElementById("settingsArkTextEndpoint").value = s.ark_text_endpoint || "";
+        document.getElementById("settingsAgnesKey").value = s.agnes_api_key || "";
+        document.getElementById("settingsAgnesBase").value = s.agnes_api_base || "";
+        document.getElementById("settingsAgnesTextModel").value = s.agnes_text_model || "agnes-2.0-flash";
 
         // 图片处理 - 引擎
-        const imgEngine = s.image_engine || "doubao";
+        const imgEngine = s.image_engine || "agnes";
         const imgRadio = document.querySelector('input[name="imageEngine"][value="' + imgEngine + '"]');
         if (imgRadio) imgRadio.checked = true;
         // 触发切换显示
@@ -1156,9 +1618,12 @@ async function loadSettingsData() {
         document.getElementById("settingsComfyHost").value = s.comfyui_host || "";
         document.getElementById("settingsComfyOutputDir").value = s.comfyui_output_dir || "";
         document.getElementById("settingsComfyImageWorkflow").value = s.comfyui_image_workflow || "";
+        document.getElementById("settingsAgnesImageKey").value = s.agnes_api_key || "";
+        document.getElementById("settingsAgnesImageModel").value = s.agnes_image_model || "agnes-image-2.1-flash";
+        document.getElementById("settingsAgnesImageEndpoint").value = s.agnes_image_endpoint || "";
 
         // 视频处理 - 引擎
-        const vidEngine = s.video_engine || "comfyui";
+        const vidEngine = s.video_engine || "agnes";
         const vidRadio = document.querySelector('input[name="videoEngine"][value="' + vidEngine + '"]');
         if (vidRadio) vidRadio.checked = true;
         const vidToggle = document.getElementById("videoEngineToggle");
@@ -1176,6 +1641,9 @@ async function loadSettingsData() {
         document.getElementById("settingsComfyVideoWorkflow").value = s.comfyui_video_workflow || "";
         document.getElementById("settingsArkVideoModel").value = s.ark_video_model || "doubao-seedance-2-0-fast-260128";
         document.getElementById("settingsArkVideoEndpoint").value = s.ark_video_endpoint || "";
+        document.getElementById("settingsAgnesVideoKey").value = s.agnes_api_key || "";
+        document.getElementById("settingsAgnesVideoModel").value = s.agnes_video_model || "agnes-video-v2.0";
+        document.getElementById("settingsAgnesVideoEndpoint").value = s.agnes_video_endpoint || "";
 
     } catch (e) {
         console.error("加载设置失败:", e);
@@ -1185,25 +1653,32 @@ async function loadSettingsData() {
 document.getElementById("btnSaveSettings").addEventListener("click", async () => {
     const settings = {
         // 文本处理
-        text_engine: document.querySelector('input[name="textEngine"]:checked')?.value || "deepseek",
+        text_engine: document.querySelector('input[name="textEngine"]:checked')?.value || "agnes",
         deepseek_api_key: document.getElementById("settingsDeepseekKey").value.trim(),
         deepseek_api_base: document.getElementById("settingsDeepseekBase").value.trim(),
         deepseek_model: document.getElementById("settingsDeepseekModel").value.trim(),
         ark_text_model: document.getElementById("settingsArkTextModel").value.trim(),
         ark_text_endpoint: document.getElementById("settingsArkTextEndpoint").value.trim(),
+        agnes_api_key: document.getElementById("settingsAgnesKey").value.trim(),
+        agnes_api_base: document.getElementById("settingsAgnesBase").value.trim(),
+        agnes_text_model: document.getElementById("settingsAgnesTextModel").value.trim(),
         // 图片处理
-        image_engine: document.querySelector('input[name="imageEngine"]:checked')?.value || "doubao",
+        image_engine: document.querySelector('input[name="imageEngine"]:checked')?.value || "agnes",
         ark_api_key: document.getElementById("settingsArkKey").value.trim(),
         ark_image_model: document.getElementById("settingsArkImageModel").value,
         ark_image_endpoint: document.getElementById("settingsArkImageEndpoint").value.trim(),
         comfyui_host: document.getElementById("settingsComfyHost").value.trim(),
         comfyui_output_dir: document.getElementById("settingsComfyOutputDir").value.trim(),
         comfyui_image_workflow: document.getElementById("settingsComfyImageWorkflow").value.trim(),
+        agnes_image_model: document.getElementById("settingsAgnesImageModel").value.trim(),
+        agnes_image_endpoint: document.getElementById("settingsAgnesImageEndpoint").value.trim(),
         // 视频处理
-        video_engine: document.querySelector('input[name="videoEngine"]:checked')?.value || "comfyui",
+        video_engine: document.querySelector('input[name="videoEngine"]:checked')?.value || "agnes",
         comfyui_video_workflow: document.getElementById("settingsComfyVideoWorkflow").value.trim(),
         ark_video_model: document.getElementById("settingsArkVideoModel").value.trim(),
         ark_video_endpoint: document.getElementById("settingsArkVideoEndpoint").value.trim(),
+        agnes_video_model: document.getElementById("settingsAgnesVideoModel").value.trim(),
+        agnes_video_endpoint: document.getElementById("settingsAgnesVideoEndpoint").value.trim(),
     };
 
     showStatus("settingsStatus", "正在保存设置...", "loading");
@@ -1328,4 +1803,5 @@ document.addEventListener("DOMContentLoaded", () => {
     initTheme();
     loadProjectList();
     loadTabData("creative");
+    populateArtStyleDropdown();
 });

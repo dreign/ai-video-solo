@@ -25,7 +25,7 @@ from logger import (
 )
 
 
-def generate_image_by_engine(prompt: str, aspect_ratio: str, output_dir: str, scene_id: str) -> str:
+def generate_image_by_engine(prompt: str, aspect_ratio: str, output_dir: str, scene_id: str, reference_image_path: str = None, engine: str = None) -> str:
     """
     根据配置的 IMAGE_ENGINE 选择图片生成方式
 
@@ -34,13 +34,16 @@ def generate_image_by_engine(prompt: str, aspect_ratio: str, output_dir: str, sc
         aspect_ratio: 画幅比例 "16:9" 或 "9:16"
         output_dir: 输出目录
         scene_id: 场景/角色ID
+        reference_image_path: 参考角色图路径（可选）
+        engine: 指定使用的引擎，不传则使用 config.IMAGE_ENGINE
 
     Returns:
         生成的图片文件路径
     """
     output_path = os.path.join(output_dir, f"scene_{scene_id}.png")
+    current_engine = engine or IMAGE_ENGINE
 
-    if IMAGE_ENGINE == "comfyui":
+    if current_engine == "comfyui":
         log_debug(f"使用 ComfyUI 生成图片: scene_id={scene_id}")
         return generate_image_via_comfyui(
             prompt=prompt,
@@ -49,9 +52,9 @@ def generate_image_by_engine(prompt: str, aspect_ratio: str, output_dir: str, sc
             scene_id=scene_id,
         )
     else:
-        # 默认使用豆包 Seedream
-        log_debug(f"使用豆包 Seedream 生成图片: scene_id={scene_id}")
-        return generate_image_by_prompt(prompt=prompt, output_path=output_path)
+        # 默认使用豆包 Seedream 或 Agnes
+        log_debug(f"使用 {current_engine} 生成图片: scene_id={scene_id}")
+        return generate_image_by_prompt(prompt=prompt, output_path=output_path, reference_image_path=reference_image_path, aspect_ratio=aspect_ratio, engine=current_engine)
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 CORS(app)
@@ -153,6 +156,22 @@ def static_files(filename):
     return send_from_directory(SOLO_DIR, filename)
 
 
+# ============ 诗词库 API ============
+@app.route("/api/poems/list", methods=["GET"])
+def api_poems_list():
+    """加载内置诗词库"""
+    poems_path = os.path.join(SOLO_DIR, "poems.json")
+    if not os.path.exists(poems_path):
+        return jsonify({"poems": []})
+    try:
+        with open(poems_path, "r", encoding="utf-8") as f:
+            poems = json.load(f)
+        return jsonify({"poems": poems})
+    except Exception as e:
+        log_error("诗词库", str(e))
+        return jsonify({"poems": []})
+
+
 # ============ 项目管理 API ============
 @app.route("/api/projects/list", methods=["GET"])
 def api_projects_list():
@@ -236,13 +255,15 @@ def save_creative():
     creative = data.get("creative", "")
     option_id = data.get("option_id", "1")
     aspect_ratio = data.get("aspect_ratio", "16:9")
+    art_style = data.get("art_style", "电影级超写实")
 
-    log_step("保存创意", "执行", f"option={SCRIPT_OPTIONS.get(option_id, {}).get('name', '')} | 画幅={aspect_ratio} | 创意长度={len(creative)}")
+    log_step("保存创意", "执行", f"option={SCRIPT_OPTIONS.get(option_id, {}).get('name', '')} | 画幅={aspect_ratio} | 风格={art_style} | 创意长度={len(creative)}")
     write_file(paths["creative"], creative)
     write_json(paths["option"], {
         "option_id": option_id,
         "option_name": SCRIPT_OPTIONS.get(option_id, {}).get("name", ""),
         "aspect_ratio": aspect_ratio,
+        "art_style": art_style,
     })
     log_info("创意已保存到 " + paths["creative"])
 
@@ -271,9 +292,10 @@ def api_generate_script():
     creative = data.get("creative", "")
     option_id = data.get("option_id", "1")
     aspect_ratio = data.get("aspect_ratio", "16:9")
+    art_style = data.get("art_style", "电影级超写实")
 
     option_name = SCRIPT_OPTIONS.get(option_id, {}).get("name", option_id)
-    log_step("生成剧本", "开始", f"option={option_name} | 画幅={aspect_ratio} | 创意长度={len(creative)}")
+    log_step("生成剧本", "开始", f"option={option_name} | 画幅={aspect_ratio} | 风格={art_style} | 创意长度={len(creative)}")
 
     if not creative:
         log_warn("生成剧本", "创意为空")
@@ -286,6 +308,7 @@ def api_generate_script():
             "option_id": option_id,
             "option_name": SCRIPT_OPTIONS.get(option_id, {}).get("name", ""),
             "aspect_ratio": aspect_ratio,
+            "art_style": art_style,
         })
         elapsed = time.time() - t0
         log_step("生成剧本", "完成", f"剧本长度={len(script)}chars | elapsed={elapsed:.1f}s")
@@ -327,15 +350,16 @@ def api_generate_storyboard():
     script = read_file(paths["script"])
     option = read_json(paths["option"], {"option_id": "1", "option_name": "", "aspect_ratio": "16:9"})
     aspect_ratio = option.get("aspect_ratio", "16:9")
+    art_style = option.get("art_style", "电影级超写实")
 
-    log_step("生成分镜", "开始", f"剧本长度={len(script)}chars | 画幅={aspect_ratio}")
+    log_step("生成分镜", "开始", f"剧本长度={len(script)}chars | 画幅={aspect_ratio} | 风格={art_style}")
 
     if not script:
         log_warn("生成分镜", "剧本为空")
         return jsonify({"success": False, "error": "请先生成剧本"}), 400
 
     try:
-        response = generate_storyboard(script, aspect_ratio)
+        response = generate_storyboard(script, aspect_ratio, art_style)
         storyboard = parse_json_response(response)
         write_json(paths["storyboard"], storyboard)
         elapsed = time.time() - t0
@@ -550,6 +574,7 @@ def api_generate_storyboard_images():
                 aspect_ratio=option.get("aspect_ratio", "16:9"),
                 output_dir=paths["storyboard_img"],
                 scene_id=scene_id,
+                reference_image_path=reference_img,
             )
             scene["img_start"] = img_path
             results.append({"scene_id": scene_id, "status": "success", "img": img_path})
@@ -690,25 +715,32 @@ def _get_config_values():
     """读取当前 config.py 中的配置值"""
     return {
         # 文本处理
-        "text_engine": getattr(app_config, "TEXT_ENGINE", "deepseek"),
+        "text_engine": getattr(app_config, "TEXT_ENGINE", "agnes"),
         "deepseek_api_key": getattr(app_config, "DEEPSEEK_API_KEY", ""),
         "deepseek_api_base": getattr(app_config, "DEEPSEEK_API_BASE", ""),
         "deepseek_model": getattr(app_config, "DEEPSEEK_MODEL", ""),
         "ark_text_model": getattr(app_config, "ARK_TEXT_MODEL", ""),
         "ark_text_endpoint": getattr(app_config, "ARK_TEXT_ENDPOINT", ""),
+        "agnes_api_key": getattr(app_config, "AGNES_API_KEY", ""),
+        "agnes_api_base": getattr(app_config, "AGNES_API_BASE", ""),
+        "agnes_text_model": getattr(app_config, "AGNES_TEXT_MODEL", ""),
         # 图片处理
-        "image_engine": getattr(app_config, "IMAGE_ENGINE", "doubao"),
+        "image_engine": getattr(app_config, "IMAGE_ENGINE", "agnes"),
         "ark_api_key": getattr(app_config, "ARK_API_KEY", ""),
         "ark_image_model": getattr(app_config, "ARK_IMAGE_MODEL", "doubao-seedream-4-5-251128"),
         "ark_image_endpoint": getattr(app_config, "ARK_IMAGE_ENDPOINT", ""),
         "comfyui_host": getattr(app_config, "COMFYUI_HOST", ""),
         "comfyui_output_dir": getattr(app_config, "COMFYUI_OUTPUT_DIR", ""),
         "comfyui_image_workflow": getattr(app_config, "COMFYUI_IMAGE_WORKFLOW", ""),
+        "agnes_image_model": getattr(app_config, "AGNES_IMAGE_MODEL", ""),
+        "agnes_image_endpoint": getattr(app_config, "AGNES_IMAGE_ENDPOINT", ""),
         # 视频处理
-        "video_engine": getattr(app_config, "VIDEO_ENGINE", "comfyui"),
+        "video_engine": getattr(app_config, "VIDEO_ENGINE", "agnes"),
         "comfyui_video_workflow": getattr(app_config, "COMFYUI_VIDEO_WORKFLOW", ""),
         "ark_video_model": getattr(app_config, "ARK_VIDEO_MODEL", ""),
         "ark_video_endpoint": getattr(app_config, "ARK_VIDEO_ENDPOINT", ""),
+        "agnes_video_model": getattr(app_config, "AGNES_VIDEO_MODEL", ""),
+        "agnes_video_endpoint": getattr(app_config, "AGNES_VIDEO_ENDPOINT", ""),
     }
 
 
@@ -725,25 +757,32 @@ def _save_config_to_file(settings):
     # 替换配置项
     replacements = {
         # 文本处理
-        "TEXT_ENGINE": settings.get("text_engine", "deepseek"),
+        "TEXT_ENGINE": settings.get("text_engine", "agnes"),
         "DEEPSEEK_API_KEY": settings.get("deepseek_api_key", ""),
         "DEEPSEEK_API_BASE": settings.get("deepseek_api_base", ""),
         "DEEPSEEK_MODEL": settings.get("deepseek_model", ""),
         "ARK_TEXT_MODEL": settings.get("ark_text_model", ""),
         "ARK_TEXT_ENDPOINT": settings.get("ark_text_endpoint", ""),
+        "AGNES_API_KEY": settings.get("agnes_api_key", ""),
+        "AGNES_API_BASE": settings.get("agnes_api_base", ""),
+        "AGNES_TEXT_MODEL": settings.get("agnes_text_model", ""),
         # 图片处理
-        "IMAGE_ENGINE": settings.get("image_engine", "doubao"),
+        "IMAGE_ENGINE": settings.get("image_engine", "agnes"),
         "ARK_API_KEY": settings.get("ark_api_key", ""),
         "ARK_IMAGE_MODEL": settings.get("ark_image_model", "doubao-seedream-4-5-251128"),
         "ARK_IMAGE_ENDPOINT": settings.get("ark_image_endpoint", ""),
         "COMFYUI_HOST": settings.get("comfyui_host", ""),
         "COMFYUI_OUTPUT_DIR": settings.get("comfyui_output_dir", ""),
         "COMFYUI_IMAGE_WORKFLOW": settings.get("comfyui_image_workflow", ""),
+        "AGNES_IMAGE_MODEL": settings.get("agnes_image_model", ""),
+        "AGNES_IMAGE_ENDPOINT": settings.get("agnes_image_endpoint", ""),
         # 视频处理
-        "VIDEO_ENGINE": settings.get("video_engine", "comfyui"),
+        "VIDEO_ENGINE": settings.get("video_engine", "agnes"),
         "COMFYUI_VIDEO_WORKFLOW": settings.get("comfyui_video_workflow", ""),
         "ARK_VIDEO_MODEL": settings.get("ark_video_model", ""),
         "ARK_VIDEO_ENDPOINT": settings.get("ark_video_endpoint", ""),
+        "AGNES_VIDEO_MODEL": settings.get("agnes_video_model", ""),
+        "AGNES_VIDEO_ENDPOINT": settings.get("agnes_video_endpoint", ""),
     }
 
     import re
@@ -842,6 +881,329 @@ def api_settings_test():
         "message": "\n".join(msg_lines),
         "all_ok": all_ok,
     })
+
+
+# ============ 角色库 API ============
+
+CHARACTER_LIBRARY_DIR = os.path.join(SOLO_DIR, "character_library")
+CHARACTER_LIBRARY_INDEX = os.path.join(CHARACTER_LIBRARY_DIR, "index.json")
+CHARACTER_LIBRARY_IMAGES = os.path.join(CHARACTER_LIBRARY_DIR, "images")
+
+
+def _load_character_library():
+    """加载角色库数据"""
+    if not os.path.exists(CHARACTER_LIBRARY_INDEX):
+        return []
+    return read_json(CHARACTER_LIBRARY_INDEX, [])
+
+
+def _save_character_library(characters):
+    """保存角色库数据"""
+    os.makedirs(CHARACTER_LIBRARY_DIR, exist_ok=True)
+    write_json(CHARACTER_LIBRARY_INDEX, characters)
+
+
+def _next_character_id(characters):
+    """生成下一个角色 ID"""
+    max_id = 0
+    for c in characters:
+        try:
+            cid = int(c.get("id", 0))
+            if cid > max_id:
+                max_id = cid
+        except (ValueError, TypeError):
+            pass
+    return f"{max_id + 1:03d}"
+
+
+@app.route("/api/character-library/list", methods=["GET"])
+def api_character_library_list():
+    """获取角色库列表"""
+    characters = _load_character_library()
+    return jsonify({"success": True, "characters": characters})
+
+
+@app.route("/api/character-library/save", methods=["POST"])
+def api_character_library_save():
+    """新增/编辑角色"""
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "error": "参数为空"}), 400
+
+    name_cn = data.get("name_cn", "").strip()
+    if not name_cn:
+        return jsonify({"success": False, "error": "角色名称不能为空"}), 400
+
+    characters = _load_character_library()
+    char_id = data.get("id", "").strip()
+
+    if char_id:
+        # 编辑已有角色
+        for c in characters:
+            if c.get("id") == char_id:
+                c["name_cn"] = name_cn
+                c["name_en"] = data.get("name_en", "").strip()
+                c["prompt"] = data.get("prompt", "").strip()
+                c["description"] = data.get("description", "").strip()
+                _save_character_library(characters)
+                return jsonify({"success": True, "character": c})
+        return jsonify({"success": False, "error": f"角色 {char_id} 不存在"}), 404
+    else:
+        # 新增角色
+        char = {
+            "id": _next_character_id(characters),
+            "name_cn": name_cn,
+            "name_en": data.get("name_en", "").strip(),
+            "prompt": data.get("prompt", "").strip(),
+            "img": "",
+            "description": data.get("description", "").strip(),
+        }
+        characters.append(char)
+        _save_character_library(characters)
+        return jsonify({"success": True, "character": char})
+
+
+@app.route("/api/character-library/delete", methods=["POST"])
+def api_character_library_delete():
+    """删除角色"""
+    data = request.get_json()
+    char_id = data.get("id", "")
+    if not char_id:
+        return jsonify({"success": False, "error": "缺少角色 ID"}), 400
+
+    characters = _load_character_library()
+    new_characters = [c for c in characters if c.get("id") != char_id]
+
+    if len(new_characters) == len(characters):
+        return jsonify({"success": False, "error": f"角色 {char_id} 不存在"}), 404
+
+    _save_character_library(new_characters)
+
+    # 清理对应图片
+    img_path = os.path.join(CHARACTER_LIBRARY_IMAGES, f"char_{char_id}.png")
+    if os.path.exists(img_path):
+        os.remove(img_path)
+
+    return jsonify({"success": True})
+
+
+@app.route("/api/character-library/generate-image", methods=["POST"])
+def api_character_library_generate_image():
+    """生成角色图"""
+    data = request.get_json()
+    char_id = data.get("id", "")
+    if not char_id:
+        return jsonify({"success": False, "error": "缺少角色 ID"}), 400
+
+    characters = _load_character_library()
+    char = None
+    for c in characters:
+        if c.get("id") == char_id:
+            char = c
+            break
+
+    if not char:
+        return jsonify({"success": False, "error": f"角色 {char_id} 不存在"}), 404
+    if not char.get("prompt"):
+        return jsonify({"success": False, "error": "角色无提示词"}), 400
+
+    os.makedirs(CHARACTER_LIBRARY_IMAGES, exist_ok=True)
+
+    try:
+        img_path = generate_image_by_engine(
+            prompt=char["prompt"],
+            aspect_ratio="16:9",
+            output_dir=CHARACTER_LIBRARY_IMAGES,
+            scene_id=f"char_{char_id}",
+        )
+        char["img"] = img_path
+        _save_character_library(characters)
+
+        return jsonify({"success": True, "img": img_path})
+    except Exception as e:
+        log_error("角色库生成图片", str(e))
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/character-library/import-project", methods=["POST"])
+def api_character_library_import_project():
+    """从当前项目导入角色到库"""
+    paths = _require_paths()
+    if not paths:
+        return jsonify({"success": False, "error": "请先选择项目"}), 400
+
+    project_chars = read_json(paths["character"])
+    if not project_chars:
+        return jsonify({"success": False, "error": "当前项目无角色"}), 400
+
+    library = _load_character_library()
+    imported = []
+    for pc in project_chars:
+        # 检查是否已存在（按 name_en 去重）
+        exists = any(lc.get("name_en") == pc.get("name_en") for lc in library)
+        if not exists:
+            char = {
+                "id": _next_character_id(library),
+                "name_cn": pc.get("name_cn", ""),
+                "name_en": pc.get("name_en", ""),
+                "prompt": pc.get("prompt", ""),
+                "img": "",
+                "description": "",
+            }
+            library.append(char)
+            imported.append(char)
+
+    _save_character_library(library)
+    return jsonify({"success": True, "imported": len(imported), "characters": library})
+
+
+# ============ 绘图风格示例图生成 API ============
+
+STYLE_SAMPLES_DIR = os.path.join(CHARACTER_LIBRARY_DIR, "style_samples")
+
+DRAWING_PROMPT_TEMPLATE = "{style_name}，8K 超高清，极致细节，完整构图，画面中心站立温柔长发年轻东方女性，飘逸长卷发，自然神态；女子脚边卧一只田园橘猫、一只小型金毛幼犬，猫狗互动亲昵；背景一栋独栋田园小木屋，木屋门前花草藤蔓环绕，远处平缓草地山林，画面上方天空悬挂暖调太阳，柔和天光，自然环境光影，完整包含人物、猫、狗、房屋、太阳五大核心元素，构图均衡，主体不裁切，元素齐全无缺失，细腻材质纹理，自然景深。图片左上角写文字：{style_name}"
+
+DEFAULT_DRAWING_STYLES = [
+    {"en": "Photorealistic", "name": "写实摄影", "desc": "超写实照片级画质，真实光影与质感", "img": ""},
+    {"en": "Anime", "name": "二次元动漫", "desc": "日式动画风格，线条简洁，色彩明快", "img": ""},
+    {"en": "Ink_Wash", "name": "水墨国风", "desc": "中国传统水墨画，墨色浓淡，意境悠远", "img": ""},
+    {"en": "Oil_Painting", "name": "油画", "desc": "油画布纹理，厚重笔触，浓郁色彩", "img": ""},
+    {"en": "Watercolor", "name": "水彩", "desc": "水彩晕染效果，柔和通透，边缘自然", "img": ""},
+    {"en": "Cyberpunk", "name": "赛博朋克", "desc": "霓虹灯光，高对比，未来都市感", "img": ""},
+    {"en": "Pixel_Art", "name": "像素艺术", "desc": "像素风格，复古游戏画面质感", "img": ""},
+    {"en": "3D_Render", "name": "3D 渲染", "desc": "三维渲染风格，立体感强，材质精细", "img": ""},
+    {"en": "Ukiyoe", "name": "浮世绘", "desc": "日本浮世绘风格，平面装饰感，线条勾勒", "img": ""},
+    {"en": "Pop_Art", "name": "波普艺术", "desc": "鲜艳色块，网点效果，漫画风", "img": ""},
+    {"en": "Sketch", "name": "素描速写", "desc": "铅笔素描质感，黑白灰层次", "img": ""},
+    {"en": "Thick_Paint", "name": "厚涂插画", "desc": "厚涂技法，立体感强，笔触明显", "img": ""},
+    {"en": "Low_Poly", "name": "Low Poly", "desc": "低多边形风格，几何面构成", "img": ""},
+    {"en": "Vaporwave", "name": "蒸汽波", "desc": "怀旧霓虹，故障艺术，复古科技感", "img": ""},
+    {"en": "Gongbi", "name": "重彩工笔画", "desc": "中国传统工笔重彩，线条精细，色彩浓郁厚重", "img": ""},
+    {"en": "Q_Version_Cartoon", "name": "Q 版卡通", "desc": "Q 版可爱风格，大头小身，造型夸张萌趣", "img": ""},
+    {"en": "Claymation", "name": "粘土黏土风", "desc": "黏土定格动画质感，手工感纹理，温暖质朴", "img": ""},
+    {"en": "3D_Cartoon_OC", "name": "3D 卡通 OC 渲染风", "desc": "三维卡通角色渲染，皮克斯风格，光影圆润", "img": ""},
+    {"en": "Chinese_Trend_Illustration", "name": "国潮插画", "desc": "国潮风格插画，传统元素与现代设计融合", "img": ""},
+    {"en": "American_Cartoon", "name": "美式卡通", "desc": "美式卡通风格，线条粗犷，色彩饱和鲜明", "img": ""},
+    {"en": "Retro_American", "name": "复古美式复古", "desc": "美式复古风格，怀旧色调，年代感纹理", "img": ""},
+    {"en": "Dark_Gothic", "name": "暗黑哥特风", "desc": "暗黑哥特风格，阴暗色调，神秘华丽装饰", "img": ""},
+    {"en": "Paper_Carving", "name": "立体纸雕风格", "desc": "立体纸雕艺术，多层纸张叠加，光影层次分明", "img": ""},
+    {"en": "Minimalist_Line_Flat", "name": "极简线条平涂风", "desc": "极简线条勾勒，平涂色彩，简约现代感", "img": ""},
+    {"en": "Korean_Soft_Comic", "name": "韩系温柔漫画风", "desc": "韩系漫画风格，柔和色调，温柔细腻画风", "img": ""},
+    {"en": "Chinese_Elegant_HandDrawn", "name": "国风唯美手绘风", "desc": "国风唯美手绘，工笔线条，淡雅水墨着色", "img": ""},
+    {"en": "Japanese_Anime_Cel", "name": "日系二次元赛璐璐风", "desc": "日式赛璐璐动画风，平涂上色，高饱和色块", "img": ""},
+    {"en": "Disney_Animation", "name": "迪斯尼动漫风格", "desc": "迪士尼动画风格，圆润造型，夸张表情，歌舞感", "img": ""},
+    {"en": "Pixar_Animation", "name": "皮克斯动漫风格", "desc": "皮克斯3D动画风格，质感细腻，光影丰富", "img": ""},
+    {"en": "DreamWorks_Animation", "name": "梦工厂动漫风格", "desc": "梦工厂动画风格，角色个性鲜明，动态感强", "img": ""},
+    {"en": "DC_Comics", "name": "DC动漫风格", "desc": "DC漫画风格，美式硬朗线条，暗色调超级英雄", "img": ""},
+    {"en": "Mecha_Anime", "name": "机甲动漫风格", "desc": "日系机甲动漫风格，机械结构精密，战斗场景宏大", "img": ""},
+]
+
+
+def _scan_engine_images(engine: str, styles: list) -> list:
+    """扫描引擎子目录中的图片，更新 styles 的 img 字段（相对路径）"""
+    engine_dir = os.path.join(STYLE_SAMPLES_DIR, engine)
+    if not os.path.exists(engine_dir):
+        return styles
+    for s in styles:
+        style_dir = os.path.join(engine_dir, s.get("en", ""))
+        candidate = os.path.join(style_dir, "scene_sample.png")
+        if os.path.exists(candidate):
+            # 计算相对于 SOLO_DIR 的路径
+            rel = os.path.relpath(candidate, SOLO_DIR)
+            s["img"] = rel
+    return styles
+
+
+def _get_engine_styles(engine: str) -> list:
+    """获取某个引擎的风格列表，文件不存在则初始化"""
+    styles_path = os.path.join(STYLE_SAMPLES_DIR, engine, "styles.json")
+    if os.path.exists(styles_path):
+        styles = read_json(styles_path, DEFAULT_DRAWING_STYLES)
+        # 合并缺失的默认风格
+        existing_ens = {s["en"] for s in styles if "en" in s}
+        for ds in DEFAULT_DRAWING_STYLES:
+            if ds["en"] not in existing_ens:
+                styles.append(dict(ds))
+        if len(styles) != len(existing_ens):
+            _save_engine_styles(engine, styles)
+        return _scan_engine_images(engine, styles)
+    # 初始化
+    os.makedirs(os.path.dirname(styles_path), exist_ok=True)
+    write_json(styles_path, DEFAULT_DRAWING_STYLES)
+    return list(DEFAULT_DRAWING_STYLES)
+
+
+def _save_engine_styles(engine: str, styles: list):
+    """保存某个引擎的风格列表"""
+    styles_path = os.path.join(STYLE_SAMPLES_DIR, engine, "styles.json")
+    os.makedirs(os.path.dirname(styles_path), exist_ok=True)
+    write_json(styles_path, styles)
+
+
+@app.route("/api/drawing-style/list", methods=["GET"])
+def api_drawing_style_list():
+    """获取绘图风格列表"""
+    engine = request.args.get("engine", "agnes")
+    if engine not in ("agnes", "doubao", "comfyui"):
+        return jsonify({"success": False, "error": f"不支持的引擎: {engine}"}), 400
+    styles = _get_engine_styles(engine)
+    return jsonify({"success": True, "styles": styles})
+
+
+@app.route("/api/drawing-style/sync", methods=["POST"])
+def api_drawing_style_sync():
+    """扫描所有引擎的子目录，将已有图片路径写入 styles.json"""
+    engines = ["agnes", "doubao", "comfyui"]
+    results = {}
+    for engine in engines:
+        styles = _get_engine_styles(engine)
+        updated = _scan_engine_images(engine, styles)
+        _save_engine_styles(engine, updated)
+        img_count = sum(1 for s in updated if s.get("img"))
+        results[engine] = {"total": len(updated), "with_img": img_count}
+    return jsonify({"success": True, "results": results})
+
+
+@app.route("/api/drawing-style/generate", methods=["POST"])
+def api_drawing_style_generate():
+    """生成绘图风格示例图"""
+    data = request.get_json()
+    style_en = (data.get("style_en", "") or "").strip()
+    style_name = (data.get("style_name", "") or "").strip()
+    engine = (data.get("engine", "") or "").strip()
+
+    if not style_en or not style_name:
+        return jsonify({"success": False, "error": "参数不完整"}), 400
+    if engine not in ("doubao", "comfyui", "agnes", ""):
+        return jsonify({"success": False, "error": f"不支持的引擎: {engine}"}), 400
+
+    # 构造提示词
+    prompt = DRAWING_PROMPT_TEMPLATE.replace("{style_name}", style_name)
+
+    # 引擎子目录
+    engine_key = engine or "default"
+    style_dir = os.path.join(STYLE_SAMPLES_DIR, engine_key, style_en)
+    os.makedirs(style_dir, exist_ok=True)
+
+    try:
+        img_path = generate_image_by_engine(
+            prompt=prompt,
+            aspect_ratio="16:9",
+            output_dir=style_dir,
+            scene_id="sample",
+            engine=engine or None,
+        )
+        # 更新 styles.json 中的 img 字段（相对路径）
+        styles = _get_engine_styles(engine_key)
+        for s in styles:
+            if s.get("en") == style_en:
+                s["img"] = os.path.relpath(img_path, SOLO_DIR)
+                break
+        _save_engine_styles(engine_key, styles)
+        return jsonify({"success": True, "img_path": img_path})
+    except Exception as e:
+        log_error("绘图风格生成", str(e))
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 # ============ 启动 ============

@@ -21,6 +21,8 @@
             <button class="tab-btn" data-tab="character">角色</button>
             <button class="tab-btn" data-tab="image-gen">生图</button>
             <button class="tab-btn" data-tab="video">视频</button>
+            <button class="tab-btn tab-btn-settings" data-tab="character-library">角色库</button>
+            <button class="tab-btn" data-tab="drawing-style">绘图风格</button>
             <button class="tab-btn tab-btn-settings" data-tab="settings">设置</button>
             <button class="tab-btn tab-btn-theme" id="themeToggle" title="切换主题">🎨</button>
             <div class="theme-dropdown" id="themeDropdown">
@@ -38,6 +40,9 @@
             <div class="panel-content">
                 <div class="form-group">
                     <label for="creativeInput">输入你的创意</label>
+                    <div class="creative-input-toolbar">
+                        <button class="btn btn-small btn-poem" id="btnOpenPoemDialog" type="button">📜 从诗词库选择</button>
+                    </div>
                     <textarea id="creativeInput" placeholder="输入一首诗词、一个故事、一段意境描述..." rows="8"></textarea>
                 </div>
                 <div class="form-group">
@@ -75,15 +80,25 @@
                         </label>
                     </div>
                 </div>
+                <div class="form-group">
+                    <label>选择绘图风格</label>
+                    <div class="style-select-wrap">
+                        <select class="style-select" id="creativeArtStyle">
+                            <option value="电影级超写实" selected>电影级超写实</option>
+                        </select>
+                    </div>
+                </div>
                 <div class="action-bar">
                     <button class="btn btn-primary" id="btnSaveCreative">1. 保存创意</button>
                     <button class="btn btn-success" id="btnGenerateScript">2. 保存创意并生成剧本</button>
                 </div>
-                <div class="project-info" id="projectInfo" style="display:none">
-                    <span class="project-id-label">当前项目：</span>
-                    <span id="currentProjectId"></span>
-                </div>
                 <div class="status-msg" id="creativeStatus"></div>
+
+                <div class="current-project-bar" id="currentProjectBar">
+                    <span class="current-project-label">当前选中项目：</span>
+                    <span class="current-project-name" id="currentProjectName">无</span>
+                    <span class="current-project-mode" id="currentProjectMode">新建项目模式</span>
+                </div>
 
                 <div class="project-history">
                     <div class="project-history-header">
@@ -143,6 +158,53 @@
             </div>
         </section>
 
+        <!-- 角色库页面 -->
+        <section class="tab-panel" id="panel-character-library">
+            <div class="panel-content">
+                <div class="action-bar">
+                    <button class="btn btn-primary" id="btnCharLibAdd">+ 新增角色</button>
+                    <button class="btn btn-accent" id="btnCharLibImport">从项目导入角色</button>
+                </div>
+                <div class="character-library-list" id="characterLibraryList">
+                    <p class="empty-hint">暂无角色库数据，请新增或从项目导入</p>
+                </div>
+                <div class="status-msg" id="characterLibraryStatus"></div>
+            </div>
+        </section>
+
+        <!-- 角色库编辑弹窗 -->
+        <div class="char-lib-dialog-overlay" id="charLibDialogOverlay" style="display:none">
+            <div class="char-lib-dialog">
+                <div class="char-lib-dialog-header">
+                    <h2 id="charLibDialogTitle">新增角色</h2>
+                    <button class="char-lib-dialog-close" id="btnCharLibDialogClose" type="button" title="关闭">×</button>
+                </div>
+                <div class="char-lib-dialog-body">
+                    <input type="hidden" id="charLibEditId">
+                    <div class="form-group">
+                        <label for="charLibNameCn">角色名称</label>
+                        <input type="text" id="charLibNameCn" placeholder="苏轼（中年）">
+                    </div>
+                    <div class="form-group">
+                        <label for="charLibNameEn">角色英文名</label>
+                        <input type="text" id="charLibNameEn" placeholder="Su_Shi">
+                    </div>
+                    <div class="form-group">
+                        <label for="charLibDescription">角色介绍</label>
+                        <textarea id="charLibDescription" placeholder="角色背景、性格特征等" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="charLibPrompt">绘图提示词</label>
+                        <textarea id="charLibPrompt" placeholder="角色的详细绘图提示词..." rows="6"></textarea>
+                    </div>
+                </div>
+                <div class="char-lib-dialog-footer">
+                    <button class="btn btn-cancel" id="btnCharLibDialogCancel">取消</button>
+                    <button class="btn btn-success" id="btnCharLibDialogSave">保存</button>
+                </div>
+            </div>
+        </div>
+
         <!-- 生图页面 -->
         <section class="tab-panel" id="panel-image-gen">
             <div class="panel-content">
@@ -193,6 +255,36 @@
             </div>
         </section>
 
+        <!-- 绘图风格页面 -->
+        <section class="tab-panel" id="panel-drawing-style">
+            <div class="panel-content">
+                <!-- ===== 提示词模版区 ===== -->
+                <div class="settings-section">
+                    <h2 class="settings-title">绘图提示词模版</h2>
+                    <p class="settings-hint">将 {绘图风格} 替换为你想要的风格名称，复制到图片生成页面的提示词框中使用</p>
+                    <div class="form-group">
+                        <div class="prompt-template-wrap">
+                            <textarea class="prompt-template" id="promptTemplateMain" readonly rows="6">{绘图风格}，8K 超高清，极致细节，完整构图，画面中心站立温柔长发年轻东方女性，飘逸长卷发，自然神态；女子脚边卧一只田园橘猫、一只小型金毛幼犬，猫狗互动亲昵；背景一栋独栋田园小木屋，木屋门前花草藤蔓环绕，远处平缓草地山林，画面上方天空悬挂暖调太阳，柔和天光，自然环境光影，完整包含人物、猫、狗、房屋、太阳五大核心元素，构图均衡，主体不裁切，元素齐全无缺失，细腻材质纹理，自然景深。图片左上角写文字：{绘图风格}</textarea>
+                            <button class="btn btn-small btn-primary" onclick="copyTemplate('promptTemplateMain')">复制</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== 常见绘图风格 ===== -->
+                <div class="settings-section">
+                    <h2 class="settings-title">常见绘图风格</h2>
+                    <div class="engine-sub-tabs" id="styleEngineTabs">
+                        <button class="sub-tab active" data-engine="agnes" onclick="switchStyleEngine('agnes')">Agnes</button>
+                        <button class="sub-tab" data-engine="doubao" onclick="switchStyleEngine('doubao')">豆包 Seedream</button>
+                        <button class="sub-tab" data-engine="comfyui" onclick="switchStyleEngine('comfyui')">ComfyUI Z-Image-Turbo</button>
+                        <button class="btn btn-accent btn-generate-all" onclick="generateAllStyles()">一键生图</button>
+                        <button class="btn btn-small btn-primary" onclick="syncStyleImages()" title="扫描已有图片写入 styles.json">同步</button>
+                    </div>
+                    <div class="style-gallery" id="styleGallery"></div>
+                </div>
+            </div>
+        </section>
+
         <!-- 设置页面 -->
         <section class="tab-panel" id="panel-settings">
             <div class="panel-content">
@@ -204,19 +296,23 @@
                     <div class="form-group">
                         <label>处理引擎</label>
                         <div class="engine-toggle" id="textEngineToggle">
-                            <label class="engine-option active" data-engine="deepseek">
-                                <input type="radio" name="textEngine" value="deepseek" checked>
+                            <label class="engine-option" data-engine="deepseek">
+                                <input type="radio" name="textEngine" value="deepseek">
                                 <span class="engine-label">DeepSeek 官方</span>
                             </label>
                             <label class="engine-option" data-engine="ark">
                                 <input type="radio" name="textEngine" value="ark">
                                 <span class="engine-label">豆包 Ark</span>
                             </label>
+                            <label class="engine-option active" data-engine="agnes">
+                                <input type="radio" name="textEngine" value="agnes" checked>
+                                <span class="engine-label">Agnes AI</span>
+                            </label>
                         </div>
                     </div>
 
                     <!-- DeepSeek 官方配置 -->
-                    <div class="engine-fields" data-engine="deepseek">
+                    <div class="engine-fields" data-engine="deepseek" style="display:none">
                         <div class="form-group">
                             <label for="settingsDeepseekKey">API Key</label>
                             <input type="password" id="settingsDeepseekKey" placeholder="sk-...">
@@ -242,6 +338,22 @@
                             <input type="text" id="settingsArkTextEndpoint" placeholder="https://ark.cn-beijing.volces.com/api/v3/responses">
                         </div>
                     </div>
+
+                    <!-- Agnes AI 配置 -->
+                    <div class="engine-fields" data-engine="agnes">
+                        <div class="form-group">
+                            <label for="settingsAgnesKey">API Key</label>
+                            <input type="password" id="settingsAgnesKey" placeholder="sk-...">
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsAgnesBase">API 地址</label>
+                            <input type="text" id="settingsAgnesBase" placeholder="https://apihub.agnes-ai.com/v1">
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsAgnesTextModel">模型</label>
+                            <input type="text" id="settingsAgnesTextModel" placeholder="agnes-2.0-flash">
+                        </div>
+                    </div>
                 </div>
 
                 <!-- ===== 图片处理 ===== -->
@@ -252,19 +364,23 @@
                     <div class="form-group">
                         <label>处理引擎</label>
                         <div class="engine-toggle" id="imageEngineToggle">
-                            <label class="engine-option active" data-engine="doubao">
-                                <input type="radio" name="imageEngine" value="doubao" checked>
+                            <label class="engine-option" data-engine="doubao">
+                                <input type="radio" name="imageEngine" value="doubao">
                                 <span class="engine-label">豆包 Seedream</span>
                             </label>
                             <label class="engine-option" data-engine="comfyui">
                                 <input type="radio" name="imageEngine" value="comfyui">
                                 <span class="engine-label">ComfyUI Z-Image-Turbo</span>
                             </label>
+                            <label class="engine-option active" data-engine="agnes">
+                                <input type="radio" name="imageEngine" value="agnes" checked>
+                                <span class="engine-label">Agnes AI</span>
+                            </label>
                         </div>
                     </div>
 
                     <!-- 豆包配置（引擎为 doubao 时显示） -->
-                    <div class="engine-fields" data-engine="doubao">
+                    <div class="engine-fields" data-engine="doubao" style="display:none">
                         <div class="form-group">
                             <label for="settingsArkKey">Ark API Key</label>
                             <input type="password" id="settingsArkKey" placeholder="...">
@@ -297,6 +413,26 @@
                             <input type="text" id="settingsComfyImageWorkflow" placeholder="image_z_image_turbo_api.json">
                         </div>
                     </div>
+
+                    <!-- Agnes AI 配置（引擎为 agnes 时显示） -->
+                    <div class="engine-fields" data-engine="agnes">
+                        <div class="form-group">
+                            <label for="settingsAgnesImageKey">API Key</label>
+                            <input type="password" id="settingsAgnesImageKey" placeholder="sk-...">
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsAgnesImageModel">模型</label>
+                            <input type="text" id="settingsAgnesImageModel" placeholder="agnes-image-2.1-flash">
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsAgnesImageEndpoint">API 端点</label>
+                            <input type="text" id="settingsAgnesImageEndpoint" placeholder="https://apihub.agnes-ai.com/v1/images/generations">
+                        </div>
+                        <div class="form-group">
+                            <label>支持模式</label>
+                            <p class="settings-hint">文生图、图生图（有角色参考图时自动切换）</p>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- ===== 视频处理 ===== -->
@@ -307,19 +443,23 @@
                     <div class="form-group">
                         <label>处理引擎</label>
                         <div class="engine-toggle" id="videoEngineToggle">
-                            <label class="engine-option active" data-engine="comfyui">
-                                <input type="radio" name="videoEngine" value="comfyui" checked>
+                            <label class="engine-option" data-engine="comfyui">
+                                <input type="radio" name="videoEngine" value="comfyui">
                                 <span class="engine-label">ComfyUI LTX I2V</span>
                             </label>
                             <label class="engine-option" data-engine="doubao">
                                 <input type="radio" name="videoEngine" value="doubao">
                                 <span class="engine-label">豆包 Seedance</span>
                             </label>
+                            <label class="engine-option active" data-engine="agnes">
+                                <input type="radio" name="videoEngine" value="agnes" checked>
+                                <span class="engine-label">Agnes AI</span>
+                            </label>
                         </div>
                     </div>
 
                     <!-- ComfyUI 配置（引擎为 comfyui 时显示） -->
-                    <div class="engine-fields" data-engine="comfyui">
+                    <div class="engine-fields" data-engine="comfyui" style="display:none">
                         <div class="form-group">
                             <label for="settingsVideoComfyHost">ComfyUI 服务地址</label>
                             <input type="text" id="settingsVideoComfyHost" placeholder="http://127.0.0.1:8000">
@@ -345,6 +485,26 @@
                             <input type="text" id="settingsArkVideoEndpoint" placeholder="https://ark.cn-beijing.volces.com/api/v3/video/generations">
                         </div>
                     </div>
+
+                    <!-- Agnes AI 配置（引擎为 agnes 时显示） -->
+                    <div class="engine-fields" data-engine="agnes">
+                        <div class="form-group">
+                            <label for="settingsAgnesVideoKey">API Key</label>
+                            <input type="password" id="settingsAgnesVideoKey" placeholder="sk-...">
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsAgnesVideoModel">模型</label>
+                            <input type="text" id="settingsAgnesVideoModel" placeholder="agnes-video-v2.0">
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsAgnesVideoEndpoint">API 端点</label>
+                            <input type="text" id="settingsAgnesVideoEndpoint" placeholder="https://apihub.agnes-ai.com/v1/videos">
+                        </div>
+                        <div class="form-group">
+                            <label>支持模式</label>
+                            <p class="settings-hint">文生视频、图生视频、多图视频、首尾帧（默认使用首帧图做图生视频）</p>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="action-bar">
@@ -355,6 +515,22 @@
             </div>
         </section>
     </main>
+
+    <!-- 诗词库选择弹窗 -->
+    <div class="poem-dialog-overlay" id="poemDialogOverlay" style="display:none">
+        <div class="poem-dialog">
+            <div class="poem-dialog-header">
+                <h2>📜 诗词库</h2>
+                <button class="poem-dialog-close" id="btnClosePoemDialog" type="button" title="关闭">×</button>
+            </div>
+            <div class="poem-search-bar">
+                <input type="text" id="poemSearchInput" placeholder="搜索诗词、作者、名句...">
+            </div>
+            <div class="poem-list" id="poemList">
+                <p class="empty-hint">加载中...</p>
+            </div>
+        </div>
+    </div>
 
     <footer class="app-footer">
         <div class="max-w-6xl mx-auto px-4 text-center space-y-2">

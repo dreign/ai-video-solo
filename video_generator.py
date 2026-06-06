@@ -1,13 +1,15 @@
-"""视频生成客户端 - 支持 ComfyUI 和豆包 Seedance"""
+"""视频生成客户端 - 支持 ComfyUI、豆包 Seedance 和 Agnes AI"""
 import json
 import os
 import shutil
 import time
+import base64
 from pathlib import Path
 import requests
 from config import (
     COMFYUI_HOST, COMFYUI_OUTPUT_DIR, VIDEO_WORKFLOW_PATH, IMAGE_Z_IMAGE_TURBO_WORKFLOW_PATH,
-    VIDEO_ENGINE, ARK_API_KEY, ARK_VIDEO_MODEL, ARK_VIDEO_ENDPOINT
+    VIDEO_ENGINE, ARK_API_KEY, ARK_VIDEO_MODEL, ARK_VIDEO_ENDPOINT,
+    AGNES_API_KEY, AGNES_VIDEO_MODEL, AGNES_VIDEO_ENDPOINT
 )
 from logger import log_step, log_video_gen, log_api_call, log_api_full_io, log_error, log_debug, log_warn, log_info
 
@@ -300,6 +302,153 @@ def generate_video_seedance(
     raise Exception(f"视频下载失败: {video_response.status_code}")
 
 
+def _file_to_data_uri(file_path: str) -> str:
+    """将本地图片文件转为 data URI"""
+    with open(file_path, "rb") as f:
+        data = f.read()
+    ext = os.path.splitext(file_path)[1].lower()
+    mime = "image/png" if ext == ".png" else "image/jpeg"
+    return f"data:{mime};base64,{base64.b64encode(data).decode('utf-8')}"
+
+
+def _create_agnes_video_task(body: dict) -> dict:
+    """创建 Agnes 视频生成任务，返回包含 task_id 的响应"""
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {AGNES_API_KEY}",
+    }
+    response = requests.post(
+        AGNES_VIDEO_ENDPOINT,
+        headers=headers,
+        json=body,
+        timeout=300,
+    )
+    if response.status_code != 200:
+        log_error("Agnes", f"创建任务失败 status={response.status_code}", response.text[:500])
+        raise Exception(f"Agnes 视频任务创建失败: {response.status_code} - {response.text}")
+    return response.json()
+
+
+def _poll_agnes_video_task(task_id: str, timeout: int = 1800) -> str:
+    """轮询 Agnes 视频任务状态，返回视频 URL"""
+    url = f"{AGNES_VIDEO_ENDPOINT}/{task_id}"
+    headers = {"Authorization": f"Bearer {AGNES_API_KEY}"}
+    start = time.time()
+    last_log = start
+
+    while time.time() - start < timeout:
+        resp = requests.get(url, headers=headers, timeout=30)
+        if resp.status_code != 200:
+            log_warn("Agnes", f"查询任务状态失败: {resp.status_code}")
+            time.sleep(5)
+            continue
+
+        result = resp.json()
+        status = result.get("status", "")
+
+        if status == "completed":
+            video_url = result.get("video_url") or result.get("remixed_from_video_id") or ""
+            if video_url:
+                return video_url
+            log_error("Agnes", "任务已完成但未获取到视频 URL", str(result))
+            raise Exception("任务已完成但未获取到视频 URL")
+        elif status in ("failed", "error"):
+            log_error("Agnes", "视频生成任务失败", str(result))
+            raise Exception(f"视频生成任务失败: {result}")
+
+        if time.time() - last_log > 30:
+            log_info(f"Agnes 视频生成中... task_id={task_id}, status={status}")
+            last_log = time.time()
+
+        time.sleep(5)
+
+    raise TimeoutError(f"Agnes 视频生成超时 ({timeout}s)")
+
+
+def generate_video_agnes(
+    image_path: str = None,
+    prompt: str = "",
+    duration: int = 5,
+    output_dir: str = "",
+    scene_id: str = "",
+) -> str:
+    """
+    使用 Agnes AI 模型生成视频（默认图生视频模式）
+
+    Args:
+        image_path: 首帧图片路径
+        prompt: 视频提示词
+        duration: 视频时长（秒）
+        output_dir: 输出目录
+        scene_id: 分镜ID
+
+    Returns:
+        生成的视频文件路径
+    """
+    t0 = time.time()
+    log_step("Agnes 视频生成", "开始", f"scene_id={scene_id} | mode=image2video | duration={duration}s")
+
+    # 计算帧数: 默认 24fps，num_frames 需满足 8n+1
+    fps = 24
+    num_frames = int(duration * fps)
+    remainder = (num_frames - 1) % 8
+    if remainder != 0:
+        num_frames = num_frames + (8 - remainder)
+
+    body = {
+        "model": AGNES_VIDEO_MODEL,
+        "prompt": prompt,
+        "width": 1152,
+        "height": 768,
+        "num_frames": num_frames,
+        "frame_rate": fps,
+    }
+
+    # 有首帧图则使用图生视频
+    if image_path:
+        body["image"] = _file_to_data_uri(image_path)
+        log_debug(f"Agnes 图生视频模式, image={image_path}")
+
+    # 创建任务
+    result = _create_agnes_video_task(body)
+    task_id = result.get("task_id") or result.get("id", "")
+    if not task_id:
+        log_error("Agnes", "未获取到 task_id", str(result))
+        raise Exception(f"未获取到 task_id: {result}")
+
+    log_info(f"Agnes 视频任务已创建, task_id={task_id}")
+
+    # 轮询获取结果
+    video_url = _poll_agnes_video_task(task_id)
+    log_debug(f"获取到视频 URL: {video_url[:100]}...")
+
+    # 下载视频
+    try:
+        video_response = requests.get(video_url, timeout=120)
+    except Exception as e:
+        log_error("Agnes", f"视频下载失败: {str(e)}")
+        raise
+
+    if video_response.status_code == 200:
+        os.makedirs(output_dir, exist_ok=True)
+        dest_path = os.path.join(output_dir, f"scene_{scene_id}.mp4")
+        with open(dest_path, "wb") as f:
+            f.write(video_response.content)
+        elapsed_total = time.time() - t0
+        file_size = os.path.getsize(dest_path)
+        log_video_gen(
+            scene_id=scene_id,
+            image_path=image_path,
+            duration=duration,
+            prompt_id=task_id,
+        )
+        log_step("Agnes 视频生成", "完成", f"scene_id={scene_id} | output={dest_path} | size={file_size}bytes | elapsed={elapsed_total:.1f}s")
+        return dest_path
+
+    log_error("Agnes", f"视频下载失败: {video_response.status_code}")
+    raise Exception(f"视频下载失败: {video_response.status_code}")
+
+
 # ============ 统一的视频生成入口 ============
 
 def generate_video(
@@ -325,6 +474,15 @@ def generate_video(
     if VIDEO_ENGINE == "doubao":
         log_debug(f"使用豆包 Seedance 生成视频: scene_id={scene_id}")
         return generate_video_seedance(
+            image_path=image_path,
+            prompt=prompt,
+            duration=duration,
+            output_dir=output_dir,
+            scene_id=scene_id,
+        )
+    elif VIDEO_ENGINE == "agnes":
+        log_debug(f"使用 Agnes AI 生成视频: scene_id={scene_id}")
+        return generate_video_agnes(
             image_path=image_path,
             prompt=prompt,
             duration=duration,

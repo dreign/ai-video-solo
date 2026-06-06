@@ -1,0 +1,10 @@
+- [x] poems.json 中所有原有字段保留未删减
+- [x] 所有诗词都补充了 author_intro 字段
+- [x] 所有诗词都补充了 writing_background 字段
+- [x] 所有诗词都补充了 translation 字段
+- [x] 所有诗词都补充了 theme 字段
+- [x] 所有诗词都补充了 appreciation 字段
+- [x] 讲解文档中有但 poems.json 中没有的诗词已补充添加
+- [x] 新增诗词的 index 是连续自增的
+- [x] 所有诗词的 index 连续无重复
+- [x] 二次校验通过，内容正确性得到保证
