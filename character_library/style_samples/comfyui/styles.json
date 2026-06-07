@@ -1,0 +1,194 @@
+[
+  {
+    "en": "Photorealistic",
+    "name": "写实摄影",
+    "desc": "超写实照片级画质，真实光影与质感",
+    "img": "character_library\\style_samples\\comfyui\\Photorealistic\\scene_sample.png"
+  },
+  {
+    "en": "Anime",
+    "name": "二次元动漫",
+    "desc": "日式动画风格，线条简洁，色彩明快",
+    "img": "character_library\\style_samples\\comfyui\\Anime\\scene_sample.png"
+  },
+  {
+    "en": "Ink_Wash",
+    "name": "水墨国风",
+    "desc": "中国传统水墨画，墨色浓淡，意境悠远",
+    "img": "character_library\\style_samples\\comfyui\\Ink_Wash\\scene_sample.png"
+  },
+  {
+    "en": "Oil_Painting",
+    "name": "油画",
+    "desc": "油画布纹理，厚重笔触，浓郁色彩",
+    "img": "character_library\\style_samples\\comfyui\\Oil_Painting\\scene_sample.png"
+  },
+  {
+    "en": "Watercolor",
+    "name": "水彩",
+    "desc": "水彩晕染效果，柔和通透，边缘自然",
+    "img": "character_library\\style_samples\\comfyui\\Watercolor\\scene_sample.png"
+  },
+  {
+    "en": "Cyberpunk",
+    "name": "赛博朋克",
+    "desc": "霓虹灯光，高对比，未来都市感",
+    "img": "character_library\\style_samples\\comfyui\\Cyberpunk\\scene_sample.png"
+  },
+  {
+    "en": "Pixel_Art",
+    "name": "像素艺术",
+    "desc": "像素风格，复古游戏画面质感",
+    "img": "character_library\\style_samples\\comfyui\\Pixel_Art\\scene_sample.png"
+  },
+  {
+    "en": "3D_Render",
+    "name": "3D 渲染",
+    "desc": "三维渲染风格，立体感强，材质精细",
+    "img": "character_library\\style_samples\\comfyui\\3D_Render\\scene_sample.png"
+  },
+  {
+    "en": "Ukiyoe",
+    "name": "浮世绘",
+    "desc": "日本浮世绘风格，平面装饰感，线条勾勒",
+    "img": "character_library\\style_samples\\comfyui\\Ukiyoe\\scene_sample.png"
+  },
+  {
+    "en": "Pop_Art",
+    "name": "波普艺术",
+    "desc": "鲜艳色块，网点效果，漫画风",
+    "img": "character_library\\style_samples\\comfyui\\Pop_Art\\scene_sample.png"
+  },
+  {
+    "en": "Sketch",
+    "name": "素描速写",
+    "desc": "铅笔素描质感，黑白灰层次",
+    "img": "character_library\\style_samples\\comfyui\\Sketch\\scene_sample.png"
+  },
+  {
+    "en": "Thick_Paint",
+    "name": "厚涂插画",
+    "desc": "厚涂技法，立体感强，笔触明显",
+    "img": "character_library\\style_samples\\comfyui\\Thick_Paint\\scene_sample.png"
+  },
+  {
+    "en": "Low_Poly",
+    "name": "Low Poly",
+    "desc": "低多边形风格，几何面构成",
+    "img": "character_library\\style_samples\\comfyui\\Low_Poly\\scene_sample.png"
+  },
+  {
+    "en": "Vaporwave",
+    "name": "蒸汽波",
+    "desc": "怀旧霓虹，故障艺术，复古科技感",
+    "img": "character_library\\style_samples\\comfyui\\Vaporwave\\scene_sample.png"
+  },
+  {
+    "en": "Gongbi",
+    "name": "重彩工笔画",
+    "desc": "中国传统工笔重彩，线条精细，色彩浓郁厚重",
+    "img": "character_library\\style_samples\\comfyui\\Gongbi\\scene_sample.png"
+  },
+  {
+    "en": "Q_Version_Cartoon",
+    "name": "Q 版卡通",
+    "desc": "Q 版可爱风格，大头小身，造型夸张萌趣",
+    "img": "character_library\\style_samples\\comfyui\\Q_Version_Cartoon\\scene_sample.png"
+  },
+  {
+    "en": "Claymation",
+    "name": "粘土黏土风",
+    "desc": "黏土定格动画质感，手工感纹理，温暖质朴",
+    "img": "character_library\\style_samples\\comfyui\\Claymation\\scene_sample.png"
+  },
+  {
+    "en": "3D_Cartoon_OC",
+    "name": "3D 卡通 OC 渲染风",
+    "desc": "三维卡通角色渲染，皮克斯风格，光影圆润",
+    "img": "character_library\\style_samples\\comfyui\\3D_Cartoon_OC\\scene_sample.png"
+  },
+  {
+    "en": "Chinese_Trend_Illustration",
+    "name": "国潮插画",
+    "desc": "国潮风格插画，传统元素与现代设计融合",
+    "img": "character_library\\style_samples\\comfyui\\Chinese_Trend_Illustration\\scene_sample.png"
+  },
+  {
+    "en": "American_Cartoon",
+    "name": "美式卡通",
+    "desc": "美式卡通风格，线条粗犷，色彩饱和鲜明",
+    "img": "character_library\\style_samples\\comfyui\\American_Cartoon\\scene_sample.png"
+  },
+  {
+    "en": "Retro_American",
+    "name": "复古美式复古",
+    "desc": "美式复古风格，怀旧色调，年代感纹理",
+    "img": "character_library\\style_samples\\comfyui\\Retro_American\\scene_sample.png"
+  },
+  {
+    "en": "Dark_Gothic",
+    "name": "暗黑哥特风",
+    "desc": "暗黑哥特风格，阴暗色调，神秘华丽装饰",
+    "img": "character_library\\style_samples\\comfyui\\Dark_Gothic\\scene_sample.png"
+  },
+  {
+    "en": "Paper_Carving",
+    "name": "立体纸雕风格",
+    "desc": "立体纸雕艺术，多层纸张叠加，光影层次分明",
+    "img": "character_library\\style_samples\\comfyui\\Paper_Carving\\scene_sample.png"
+  },
+  {
+    "en": "Minimalist_Line_Flat",
+    "name": "极简线条平涂风",
+    "desc": "极简线条勾勒，平涂色彩，简约现代感",
+    "img": "character_library\\style_samples\\comfyui\\Minimalist_Line_Flat\\scene_sample.png"
+  },
+  {
+    "en": "Korean_Soft_Comic",
+    "name": "韩系温柔漫画风",
+    "desc": "韩系漫画风格，柔和色调，温柔细腻画风",
+    "img": "character_library\\style_samples\\comfyui\\Korean_Soft_Comic\\scene_sample.png"
+  },
+  {
+    "en": "Chinese_Elegant_HandDrawn",
+    "name": "国风唯美手绘风",
+    "desc": "国风唯美手绘，工笔线条，淡雅水墨着色",
+    "img": "character_library\\style_samples\\comfyui\\Chinese_Elegant_HandDrawn\\scene_sample.png"
+  },
+  {
+    "en": "Japanese_Anime_Cel",
+    "name": "日系二次元赛璐璐风",
+    "desc": "日式赛璐璐动画风，平涂上色，高饱和色块",
+    "img": "character_library\\style_samples\\comfyui\\Japanese_Anime_Cel\\scene_sample.png"
+  },
+  {
+    "en": "Disney_Animation",
+    "name": "迪斯尼动漫风格",
+    "desc": "迪士尼动画风格，圆润造型，夸张表情，歌舞感",
+    "img": "character_library\\style_samples\\comfyui\\Disney_Animation\\scene_sample.png"
+  },
+  {
+    "en": "Pixar_Animation",
+    "name": "皮克斯动漫风格",
+    "desc": "皮克斯3D动画风格，质感细腻，光影丰富",
+    "img": "character_library\\style_samples\\comfyui\\Pixar_Animation\\scene_sample.png"
+  },
+  {
+    "en": "DreamWorks_Animation",
+    "name": "梦工厂动漫风格",
+    "desc": "梦工厂动画风格，角色个性鲜明，动态感强",
+    "img": "character_library\\style_samples\\comfyui\\DreamWorks_Animation\\scene_sample.png"
+  },
+  {
+    "en": "DC_Comics",
+    "name": "DC动漫风格",
+    "desc": "DC漫画风格，美式硬朗线条，暗色调超级英雄",
+    "img": "character_library\\style_samples\\comfyui\\DC_Comics\\scene_sample.png"
+  },
+  {
+    "en": "Mecha_Anime",
+    "name": "机甲动漫风格",
+    "desc": "日系机甲动漫风格，机械结构精密，战斗场景宏大",
+    "img": "character_library\\style_samples\\comfyui\\Mecha_Anime\\scene_sample.png"
+  }
+]
