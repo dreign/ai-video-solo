@@ -150,6 +150,7 @@
                 <div class="action-bar">
                     <button class="btn btn-success" id="btnExtractCharacters">8. 提取角色</button>
                     <button class="btn btn-accent" id="btnGenerateCharImgs">9. 生成角色图</button>
+                    <button class="btn btn-primary" id="btnSaveCharacters">保存角色</button>
                 </div>
                 <div class="character-list" id="characterList">
                     <p class="empty-hint">暂无角色数据，请先提取角色</p>
@@ -225,6 +226,15 @@
             <div class="panel-content video-panel">
                 <div class="action-bar">
                     <button class="btn btn-primary" id="btnRefreshVideos">13. 刷新视频列表</button>
+                    <button class="btn btn-accent" id="btnExportJianying">导出剪映草稿</button>
+                </div>
+
+                <!-- 视频生成队列状态 -->
+                <div class="video-queue-section">
+                    <h3>视频生成队列</h3>
+                    <div class="video-queue-list" id="videoQueueList">
+                        <p class="empty-hint">暂无队列任务</p>
+                    </div>
                 </div>
 
                 <!-- 主播放器区域 -->
@@ -364,18 +374,34 @@
                     <div class="form-group">
                         <label>处理引擎</label>
                         <div class="engine-toggle" id="imageEngineToggle">
-                            <label class="engine-option" data-engine="doubao">
-                                <input type="radio" name="imageEngine" value="doubao">
-                                <span class="engine-label">豆包 Seedream</span>
-                            </label>
                             <label class="engine-option" data-engine="comfyui">
                                 <input type="radio" name="imageEngine" value="comfyui">
                                 <span class="engine-label">ComfyUI Z-Image-Turbo</span>
+                            </label>
+                            <label class="engine-option" data-engine="doubao">
+                                <input type="radio" name="imageEngine" value="doubao">
+                                <span class="engine-label">豆包 Seedream</span>
                             </label>
                             <label class="engine-option active" data-engine="agnes">
                                 <input type="radio" name="imageEngine" value="agnes" checked>
                                 <span class="engine-label">Agnes AI</span>
                             </label>
+                        </div>
+                    </div>
+
+                    <!-- ComfyUI 配置（引擎为 comfyui 时显示） -->
+                    <div class="engine-fields" data-engine="comfyui" style="display:none">
+                        <div class="form-group">
+                            <label for="settingsComfyHost">ComfyUI 服务地址</label>
+                            <input type="text" id="settingsComfyHost" placeholder="http://127.0.0.1:8000">
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsComfyOutputDir">ComfyUI 输出目录</label>
+                            <input type="text" id="settingsComfyOutputDir" placeholder="C:\Users\...\ComfyUI\output">
+                        </div>
+                        <div class="form-group">
+                            <label for="settingsComfyImageWorkflow">文生图工作流文件</label>
+                            <input type="text" id="settingsComfyImageWorkflow" placeholder="image_z_image_turbo_api.json">
                         </div>
                     </div>
 
@@ -395,22 +421,6 @@
                         <div class="form-group">
                             <label for="settingsArkImageEndpoint">API 端点</label>
                             <input type="text" id="settingsArkImageEndpoint" placeholder="https://ark.cn-beijing.volces.com/api/v3/images/generations">
-                        </div>
-                    </div>
-
-                    <!-- ComfyUI 配置（引擎为 comfyui 时显示） -->
-                    <div class="engine-fields" data-engine="comfyui" style="display:none">
-                        <div class="form-group">
-                            <label for="settingsComfyHost">ComfyUI 服务地址</label>
-                            <input type="text" id="settingsComfyHost" placeholder="http://127.0.0.1:8000">
-                        </div>
-                        <div class="form-group">
-                            <label for="settingsComfyOutputDir">ComfyUI 输出目录</label>
-                            <input type="text" id="settingsComfyOutputDir" placeholder="C:\Users\...\ComfyUI\output">
-                        </div>
-                        <div class="form-group">
-                            <label for="settingsComfyImageWorkflow">文生图工作流文件</label>
-                            <input type="text" id="settingsComfyImageWorkflow" placeholder="image_z_image_turbo_api.json">
                         </div>
                     </div>
 
@@ -533,26 +543,37 @@
     </div>
 
     <footer class="app-footer">
-        <div class="max-w-6xl mx-auto px-4 text-center space-y-2">
-        <p class="text-tungsten-500 text-xs"><strong>SOLO视频创意工坊 v1.0</strong></p>
-        <div class="flex justify-center gap-4 text-xs">
-            <a href="" target="_blank" rel="noopener noreferrer" style="color: #a1a1aa; text-decoration: none; transition: color 0.2s;">
-            沪ICP备2026011498号-2
-            </a>
-            <span class="text-tungsten-600">|</span>
-            <a href="mailto:fengbuxiu@foxmail.com" style="color: #a1a1aa; text-decoration: none; transition: color 0.2s;">
-            联系邮箱：fengbuxiu
-            </a>
+        <div>
+            <p><strong>SOLO视频创意工坊 v1.0</strong></p>
+            <div>
+                <a href="" target="_blank" rel="noopener noreferrer">沪ICP备2026011498号-2</a>
+                <span class="footer-divider">|</span>
+                <a href="mailto:fengbuxiu@foxmail.com">联系邮箱：fengbuxiu</a>
+            </div>
+            <p>
+                © 2026 <a href="" target="_blank" rel="noopener noreferrer">@和风</a> VibeCoding
+            </p>
         </div>
-        <p class="text-tungsten-500 text-xs">
-            © 2026  <a href="" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300" style="color: #60a5fa; text-decoration: none; transition: color 0.2s;">
-            @和风
-            </a> VibeCoding
-        </p>
     </footer>
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-spinner"></div>
         <div class="loading-text">处理中...</div>
+        <div class="loading-content-panel" id="loadingContentPanel" style="display:none">
+            <div class="loading-section">
+                <div class="loading-section-title">
+                    <span>💭</span>
+                    <span>思考过程</span>
+                </div>
+                <div class="loading-section-content loading-thinking" id="loadingThinking">等待中...</div>
+            </div>
+            <div class="loading-section">
+                <div class="loading-section-title">
+                    <span>📝</span>
+                    <span>生成内容</span>
+                </div>
+                <div class="loading-section-content loading-content" id="loadingContent">等待中...</div>
+            </div>
+        </div>
     </div>
 
     <script src="app.js"></script>

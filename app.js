@@ -34,7 +34,29 @@ function hideLoading() {
     if (loadingCount <= 0) {
         loadingCount = 0;
         document.getElementById("loadingOverlay").classList.remove("show");
+        document.getElementById("loadingContentPanel").style.display = "none";
+        document.getElementById("loadingThinking").textContent = "等待中...";
+        document.getElementById("loadingContent").textContent = "等待中...";
     }
+}
+
+function showStreamPanel() {
+    document.getElementById("loadingContentPanel").style.display = "block";
+}
+
+function updateStreamContent(type, content) {
+    if (type === "thinking") {
+        const thinkingEl = document.getElementById("loadingThinking");
+        thinkingEl.textContent = content;
+    } else if (type === "content") {
+        const contentEl = document.getElementById("loadingContent");
+        contentEl.textContent += content;
+    }
+}
+
+function clearStreamContent() {
+    document.getElementById("loadingThinking").textContent = "等待中...";
+    document.getElementById("loadingContent").textContent = "";
 }
 
 async function apiFetch(url, options = {}) {
@@ -44,7 +66,14 @@ async function apiFetch(url, options = {}) {
             headers: { "Content-Type": "application/json" },
             ...options,
         });
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`HTTP ${response.status}: ${text}`);
+        }
         return await response.json();
+    } catch (e) {
+        console.error("API 请求失败:", url, e);
+        throw e;
     } finally {
         hideLoading();
     }
@@ -103,6 +132,12 @@ function switchTab(tabName) {
     const panel = document.getElementById(`panel-${tabName}`);
     if (panel) panel.classList.add("active");
 
+    // 离开视频页面时清除队列刷新定时器
+    if (currentTab === "video" && tabName !== "video" && window._videoQueueInterval) {
+        clearInterval(window._videoQueueInterval);
+        window._videoQueueInterval = null;
+    }
+
     currentTab = tabName;
     loadTabData(tabName);
 
@@ -140,7 +175,7 @@ function renderCharacterLibraryList(characters) {
             ${char.description ? `<div class="char-lib-desc">${escapeHtml(char.description)}</div>` : ""}
             <div class="char-lib-prompt">${char.prompt ? escapeHtml(char.prompt).slice(0, 200) + (char.prompt.length > 200 ? "..." : "") : "无提示词"}</div>
             ${imgSrc
-                ? `<img class="char-lib-img" src="${imgSrc}" alt="${char.name_cn}" onmouseenter="showImagePreview(this.src)" onmouseleave="hideImagePreview()">`
+                ? `<img class="char-lib-img" src="${imgSrc}" alt="${char.name_cn}" onclick="showImagePreview(this.src)">`
                 : '<div class="char-lib-img-placeholder">角色图未生成</div>'}
             <div class="char-lib-actions">
                 <button class="btn btn-small btn-accent" onclick="charLibGenerateImage('${char.id}')">生成图</button>
@@ -450,6 +485,10 @@ async function loadTabData(tabName) {
             break;
         case "video":
             await loadVideoData();
+            loadVideoQueue();
+            // 定时刷新队列状态
+            if (window._videoQueueInterval) clearInterval(window._videoQueueInterval);
+            window._videoQueueInterval = setInterval(loadVideoQueue, 10000);
             break;
         case "settings":
             await loadSettingsData();
@@ -777,23 +816,69 @@ document.getElementById("btnGenerateScript").addEventListener("click", async () 
     const artStyle = document.getElementById("creativeArtStyle").value;
 
     // 先保存创意
-    showStatus("creativeStatus", "正在保存创意并生成剧本...", "loading");
+    showStatus("creativeStatus", "正在保存创意...", "loading");
     await apiFetch("/api/creative/save", {
         method: "POST",
         body: JSON.stringify({ creative, option_id: optionId, aspect_ratio: aspectRatio, art_style: artStyle }),
     });
 
-    // 生成剧本
-    const result = await apiFetch("/api/script/generate", {
-        method: "POST",
-        body: JSON.stringify({ creative, option_id: optionId, aspect_ratio: aspectRatio }),
-    });
+    // 使用流式API生成剧本
+    showLoading();
+    clearStreamContent();
+    showStreamPanel();
 
-    if (result.success) {
-        showStatus("creativeStatus", "剧本生成成功！切换到剧本页面查看", "success");
-        setTimeout(() => switchTab("script"), 1000);
-    } else {
-        showStatus("creativeStatus", result.error || "剧本生成失败", "error");
+    try {
+        const response = await fetch("/api/script/generate-stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ creative, option_id: optionId, aspect_ratio: aspectRatio }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const messages = buffer.split("\n\n");
+            
+            for (const msg of messages) {
+                if (msg.startsWith("data: ")) {
+                    try {
+                        const data = JSON.parse(msg.slice(6));
+                        if (data.type === "thinking") {
+                            updateStreamContent("thinking", data.content);
+                        } else if (data.type === "content") {
+                            updateStreamContent("content", data.content);
+                        } else if (data.type === "done") {
+                            hideLoading();
+                            showStatus("creativeStatus", "剧本生成成功！切换到剧本页面查看", "success");
+                            setTimeout(() => switchTab("script"), 1000);
+                            return;
+                        } else if (data.type === "error") {
+                            hideLoading();
+                            showStatus("creativeStatus", data.error || "剧本生成失败", "error");
+                            return;
+                        }
+                    } catch (e) {
+                        console.warn("解析SSE消息失败:", e);
+                    }
+                }
+            }
+            
+            buffer = messages.pop() || "";
+        }
+    } catch (e) {
+        hideLoading();
+        console.error("流式请求失败:", e);
+        showStatus("creativeStatus", "请求失败: " + e.message, "error");
     }
 });
 
@@ -937,7 +1022,17 @@ document.getElementById('btnTogglePreview').addEventListener('click', () => {
     }
 });
 
-// ============ 分镜页面（仅显示JSON字段 + 重新生成） ============
+// ============ 分镜页面（支持编辑 + 重新生成） ============
+let currentStoryboard = [];
+
+function renderFieldRowEditable(label, value, sceneIdx, field) {
+    const val = value !== undefined && value !== null ? String(value) : "";
+    return `<div class="scene-field">
+        <label>${label}</label>
+        <textarea class="field-value-input" data-scene-idx="${sceneIdx}" data-field="${field}" rows="2">${escapeHtml(val)}</textarea>
+    </div>`;
+}
+
 function renderFieldRow(label, value) {
     if (!value && value !== 0 && value !== false) return "";
     return `<div class="scene-field"><label>${label}</label><span class="field-value">${escapeHtml(String(value))}</span></div>`;
@@ -950,25 +1045,26 @@ function escapeHtml(str) {
 }
 
 function renderStoryboardList(storyboard) {
+    currentStoryboard = storyboard || [];
     const container = document.getElementById("storyboardList");
-    if (!storyboard || storyboard.length === 0) {
+    if (!currentStoryboard || currentStoryboard.length === 0) {
         container.innerHTML = '<p class="empty-hint">暂无分镜数据，请先生成分镜</p>';
         return;
     }
 
     let html = "";
-    storyboard.forEach((scene) => {
+    currentStoryboard.forEach((scene, idx) => {
         html += `
-        <div class="storyboard-scene">
+        <div class="storyboard-scene" data-scene-idx="${idx}">
             <div class="scene-header">
                 <span class="scene-id">${scene.scene_id} - ${scene.group_id || ""}</span>
                 <span class="scene-duration">${scene.duration || 0}秒</span>
             </div>
-            ${renderFieldRow("描述", scene.desc)}
-            ${renderFieldRow("视频提示词 (prompt_video)", scene.prompt_video)}
-            ${renderFieldRow("首帧图提示词 (prompt_img_start)", scene.prompt_img_start)}
-            ${renderFieldRow("尾帧图提示词 (prompt_img_end)", scene.prompt_img_end)}
-            ${renderFieldRow("对话/旁白", scene.narration)}
+            ${renderFieldRowEditable("描述", scene.desc, idx, "desc")}
+            ${renderFieldRowEditable("视频提示词 (prompt_video)", scene.prompt_video, idx, "prompt_video")}
+            ${renderFieldRowEditable("首帧图提示词 (prompt_img_start)", scene.prompt_img_start, idx, "prompt_img_start")}
+            ${renderFieldRowEditable("尾帧图提示词 (prompt_img_end)", scene.prompt_img_end, idx, "prompt_img_end")}
+            ${renderFieldRowEditable("对话/旁白", scene.narration, idx, "narration")}
             ${renderFieldRow("首帧图", scene.img_start)}
             ${renderFieldRow("尾帧图", scene.img_end)}
             ${renderFieldRow("视频", scene.video)}
@@ -976,6 +1072,17 @@ function renderStoryboardList(storyboard) {
         </div>`;
     });
     container.innerHTML = html;
+
+    // 绑定输入框变更事件
+    container.querySelectorAll("textarea.field-value-input").forEach((ta) => {
+        ta.addEventListener("input", (e) => {
+            const idx = parseInt(ta.dataset.sceneIdx);
+            const field = ta.dataset.field;
+            if (currentStoryboard[idx]) {
+                currentStoryboard[idx][field] = ta.value;
+            }
+        });
+    });
 }
 
 async function loadStoryboardData() {
@@ -988,9 +1095,28 @@ async function loadStoryboardData() {
     }
 }
 
-document.getElementById("btnSaveStoryboard").addEventListener("click", async () => {
-    showStatus("storyboardStatus", "分镜数据已自动保存", "success");
-});
+async function saveStoryboard() {
+    if (!currentStoryboard || currentStoryboard.length === 0) {
+        showStatus("storyboardStatus", "暂无分镜数据", "error");
+        return;
+    }
+    showStatus("storyboardStatus", "正在保存分镜...", "loading");
+    try {
+        const result = await apiFetch("/api/storyboard/save", {
+            method: "POST",
+            body: JSON.stringify({ storyboard: currentStoryboard }),
+        });
+        if (result.success) {
+            showStatus("storyboardStatus", "分镜已保存", "success");
+        } else {
+            showStatus("storyboardStatus", result.error || "保存失败", "error");
+        }
+    } catch (e) {
+        showStatus("storyboardStatus", "保存请求失败: " + e.message, "error");
+    }
+}
+
+document.getElementById("btnSaveStoryboard").addEventListener("click", saveStoryboard);
 
 document.getElementById("btnRegenerateStoryboard").addEventListener("click", async () => {
     showStatus("storyboardStatus", "正在重新生成分镜...", "loading");
@@ -1043,9 +1169,15 @@ function renderImageGenList(storyboard) {
                     ? `<div class="media-box">
                         <label>首帧图</label>
                         <img src="${scene.img_start}?t=${Date.now()}" alt="首帧图">
-                        <button class="btn btn-small" onclick="openFileLocation('${scene.img_start.replace(/\\/g, "\\\\")}')">打开文件位置</button>
+                        <div class="media-actions">
+                            <button class="btn btn-small" onclick="openFileLocation('${scene.img_start.replace(/\\/g, "\\\\")}')">打开文件位置</button>
+                            <button class="btn btn-small btn-accent btn-regen-img" data-scene-id="${scene.scene_id}" title="重新生成首帧图">🔄 重生成</button>
+                        </div>
                     </div>`
-                    : '<div class="media-placeholder">首帧图未生成</div>'}
+                    : `<div class="media-placeholder">
+                        <div>首帧图未生成</div>
+                        ${scene.prompt_img_start ? `<button class="btn btn-small btn-accent btn-regen-img" data-scene-id="${scene.scene_id}" title="生成首帧图">🔄 生成</button>` : ""}
+                    </div>`}
                 ${scene.video
                     ? `<div class="media-box">
                         <label>视频</label>
@@ -1059,9 +1191,33 @@ function renderImageGenList(storyboard) {
 
     container.innerHTML = html;
 
+    // 绑定分镜首帧图重新生成按钮事件
+    container.querySelectorAll(".btn-regen-img").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            const sceneId = btn.dataset.sceneId;
+            await regenerateStoryboardImage(sceneId);
+        });
+    });
+
     // 渲染横排预览
     renderPreviewRow("imgPreviewRow", storyboard, "img_start", "首帧图");
     renderPreviewRow("videoPreviewRow", storyboard, "video", "视频");
+}
+
+async function regenerateStoryboardImage(sceneId) {
+    showStatus("imageGenStatus", `正在重新生成分镜 ${sceneId} 的首帧图...`, "loading");
+    try {
+        const result = await apiFetch(`/api/storyboard/generate-image/${sceneId}`, { method: "POST" });
+        if (result.success) {
+            await loadImageGenData();
+            showStatus("imageGenStatus", `分镜 ${sceneId} 首帧图重新生成完成`, "success");
+        } else {
+            showStatus("imageGenStatus", result.error || "重新生成失败", "error");
+        }
+    } catch (e) {
+        showStatus("imageGenStatus", "请求失败: " + e.message, "error");
+    }
 }
 
 function renderPreviewRow(rowId, storyboard, field, label) {
@@ -1080,7 +1236,7 @@ function renderPreviewRow(rowId, storyboard, field, label) {
         if (field === "video") {
             html += `<div class="preview-item"><video src="${src}" controls></video><div class="preview-label">${s.scene_id}</div><button class="btn btn-small" onclick="openFileLocation('${s[field].replace(/\\/g, "\\\\")}')">打开</button></div>`;
         } else {
-            html += `<div class="preview-item"><img src="${src}" alt="${s.scene_id}"><div class="preview-label">${s.scene_id}</div><button class="btn btn-small" onclick="openFileLocation('${s[field].replace(/\\/g, "\\\\")}')">打开</button></div>`;
+            html += `<div class="preview-item"><img src="${src}" alt="${s.scene_id}" onclick="showImagePreview(this.src)"><div class="preview-label">${s.scene_id}</div><button class="btn btn-small" onclick="openFileLocation('${s[field].replace(/\\/g, "\\\\")}')">打开</button></div>`;
         }
     });
     row.innerHTML = html;
@@ -1121,40 +1277,126 @@ document.getElementById("btnGenerateImgs").addEventListener("click", async () =>
 });
 
 document.getElementById("btnGenerateVideos").addEventListener("click", async () => {
-    showStatus("imageGenStatus", "正在生成视频，这可能需要较长时间...", "loading");
-    const result = await apiFetch("/api/storyboard/generate-videos", { method: "POST" });
-    if (result.success) {
-        result.storyboard = await convertStoryboardMediaUrls(result.storyboard);
-        renderImageGenList(result.storyboard);
-        showStatus("imageGenStatus", "视频生成完成", "success");
-    } else {
-        showStatus("imageGenStatus", result.error || "生成失败", "error");
+    showStatus("imageGenStatus", "正在生成视频，请稍候...", "loading");
+    try {
+        const result = await apiFetch("/api/storyboard/generate-videos", { method: "POST" });
+        if (result.success) {
+            result.storyboard = await convertStoryboardMediaUrls(result.storyboard);
+            renderImageGenList(result.storyboard);
+
+            // 统计各状态数量
+            const total = result.results ? result.results.length : 0;
+            const completedCount = result.results ? result.results.filter(r => r.status === "completed").length : 0;
+            const queuedCount = result.results ? result.results.filter(r => r.status === "queued").length : 0;
+            const skipCount = result.results ? result.results.filter(r => r.status === "skip" || r.status === "skipped").length : 0;
+            const errorCount = result.results ? result.results.filter(r => r.status === "error").length : 0;
+
+            if (completedCount > 0) {
+                showStatus("imageGenStatus", `已完成 ${completedCount}/${total} 个视频生成`, "success");
+            } else if (queuedCount > 0) {
+                showStatus("imageGenStatus", `已提交 ${queuedCount} 个视频任务到队列，切换到视频页面查看进度`, "success");
+            } else if (skipCount > 0 && errorCount === 0) {
+                showStatus("imageGenStatus", `所有分镜已处理（${skipCount} 个跳过）`, "success");
+            } else if (errorCount > 0) {
+                showStatus("imageGenStatus", `处理完成，${errorCount} 个失败`, "error");
+            } else {
+                showStatus("imageGenStatus", "视频处理完成", "success");
+            }
+        } else {
+            showStatus("imageGenStatus", result.error || "生成失败", "error");
+        }
+    } catch (e) {
+        showStatus("imageGenStatus", "请求异常: " + e.message, "error");
+        console.error("生成视频按钮异常:", e);
     }
 });
 
 // ============ 角色页面 ============
+let currentCharacters = [];
+
 function renderCharacterList(characters) {
+    currentCharacters = characters || [];
     const container = document.getElementById("characterList");
-    if (!characters || characters.length === 0) {
+    if (!currentCharacters || currentCharacters.length === 0) {
         container.innerHTML = '<p class="empty-hint">暂无角色数据，请先提取角色</p>';
         return;
     }
 
     let html = "";
-    characters.forEach((char) => {
+    currentCharacters.forEach((char, idx) => {
+        const hasImg = char.img && char.img.trim() !== "";
         html += `
-        <div class="character-card">
+        <div class="character-card" data-char-idx="${idx}">
             <div class="char-header">
-                <span class="char-name">${char.name_cn || ""}</span>
-                <span class="char-name-en">${char.name_en || ""}</span>
+                <input class="char-name-input" data-field="name_cn" data-idx="${idx}" value="${escapeHtml(char.name_cn || "")}" placeholder="中文名">
+                <input class="char-name-en-input" data-field="name_en" data-idx="${idx}" value="${escapeHtml(char.name_en || "")}" placeholder="英文名">
             </div>
-            <div class="char-prompt">${char.prompt || "无提示词"}</div>
-            ${char.img
-                ? `<img class="char-img" src="${char.img}?t=${Date.now()}" alt="${char.name_cn}" onmouseenter="showImagePreview(this.src)" onmouseleave="hideImagePreview()">`
-                : '<div class="char-img-placeholder">角色图未生成</div>'}
+            <textarea class="char-prompt-input" data-field="prompt" data-idx="${idx}" placeholder="提示词">${escapeHtml(char.prompt || "")}</textarea>
+            <div class="char-media-wrap">
+                ${hasImg
+                    ? `<img class="char-img" src="${char.img}?t=${Date.now()}" alt="${char.name_cn}" onclick="showImagePreview(this.src)">`
+                    : '<div class="char-img-placeholder">角色图未生成</div>'}
+                <button class="btn btn-small btn-accent btn-regen-char" data-char-id="${char.id}" title="重新生成角色图">🔄</button>
+            </div>
         </div>`;
     });
     container.innerHTML = html;
+
+    // 绑定输入框变更事件（实时更新内存数据）
+    container.querySelectorAll("input[data-field], textarea[data-field]").forEach((input) => {
+        input.addEventListener("input", (e) => {
+            const idx = parseInt(input.dataset.idx);
+            const field = input.dataset.field;
+            if (currentCharacters[idx]) {
+                currentCharacters[idx][field] = input.value;
+            }
+        });
+    });
+
+    // 绑定重新生成按钮事件
+    container.querySelectorAll(".btn-regen-char").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            const charId = btn.dataset.charId;
+            await regenerateCharacterImage(charId);
+        });
+    });
+}
+
+async function saveCharacters() {
+    if (!currentCharacters || currentCharacters.length === 0) {
+        showStatus("characterStatus", "暂无角色数据", "error");
+        return;
+    }
+    showStatus("characterStatus", "正在保存角色...", "loading");
+    try {
+        const result = await apiFetch("/api/character/save", {
+            method: "POST",
+            body: JSON.stringify({ characters: currentCharacters }),
+        });
+        if (result.success) {
+            showStatus("characterStatus", "角色已保存", "success");
+        } else {
+            showStatus("characterStatus", result.error || "保存失败", "error");
+        }
+    } catch (e) {
+        showStatus("characterStatus", "保存请求失败: " + e.message, "error");
+    }
+}
+
+async function regenerateCharacterImage(charId) {
+    showStatus("characterStatus", `正在重新生成角色 ${charId} 的图片...`, "loading");
+    try {
+        const result = await apiFetch(`/api/character/generate-image/${charId}`, { method: "POST" });
+        if (result.success) {
+            await loadCharacterData();
+            showStatus("characterStatus", `角色 ${charId} 图片重新生成完成`, "success");
+        } else {
+            showStatus("characterStatus", result.error || "重新生成失败", "error");
+        }
+    } catch (e) {
+        showStatus("characterStatus", "请求失败: " + e.message, "error");
+    }
 }
 
 async function loadCharacterData() {
@@ -1190,6 +1432,8 @@ document.getElementById("btnGenerateCharImgs").addEventListener("click", async (
     }
 });
 
+document.getElementById("btnSaveCharacters").addEventListener("click", saveCharacters);
+
 // ============ 视频页面 ============
 let currentVideos = [];
 let currentVideoIndex = -1;
@@ -1206,6 +1450,7 @@ function renderStoryboardTimeline(storyboard) {
     let html = "";
     storyboard.forEach((scene, index) => {
         const hasVideo = scene.video && scene.video.trim() !== "";
+        const hasVideoId = scene.video_id && scene.video_id.trim() !== "";
         html += `
         <div class="timeline-item ${hasVideo ? '' : 'no-video'}" data-index="${index}" data-scene-id="${scene.scene_id}">
             <div class="timeline-thumb">
@@ -1218,9 +1463,30 @@ function renderStoryboardTimeline(storyboard) {
                 <div class="timeline-scene-id">${scene.scene_id}</div>
                 <div class="timeline-duration">${scene.duration || 0}秒</div>
             </div>
+            <button class="btn btn-small btn-accent btn-regen-video" data-scene-id="${scene.scene_id}" title="重新生成视频">🔄</button>
         </div>`;
     });
+
+    // 绑定重生成视频按钮
+    container.querySelectorAll(".btn-regen-video").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            const sceneId = btn.dataset.sceneId;
+            if (!confirm(`确定要重新生成分镜 ${sceneId} 的视频吗？`)) return;
+            await regenerateVideo(sceneId);
+        });
+    });
     container.innerHTML = html;
+
+    // 绑定重生成视频按钮
+    container.querySelectorAll(".btn-regen-video").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            const sceneId = btn.dataset.sceneId;
+            if (!confirm(`确定要重新生成分镜 ${sceneId} 的视频吗？`)) return;
+            await regenerateVideo(sceneId);
+        });
+    });
 
     // 绑定点击事件
     container.querySelectorAll('.timeline-item').forEach(item => {
@@ -1245,6 +1511,21 @@ function renderStoryboardTimeline(storyboard) {
             hideTimelinePreview();
         });
     });
+}
+
+async function regenerateVideo(sceneId) {
+    showStatus("videoStatus", `正在重新生成分镜 ${sceneId} 的视频...`, "loading");
+    try {
+        const result = await apiFetch(`/api/video/regenerate/${sceneId}`, { method: "POST" });
+        if (result.success) {
+            showStatus("videoStatus", `分镜 ${sceneId} 已重新加入生成队列`, "success");
+            loadVideoQueue();
+        } else {
+            showStatus("videoStatus", result.error || "重生成失败", "error");
+        }
+    } catch (e) {
+        showStatus("videoStatus", "请求失败: " + e.message, "error");
+    }
 }
 
 // 播放指定索引的视频
@@ -1344,10 +1625,146 @@ async function loadVideoData() {
     }
 }
 
+// 渲染视频生成队列
+function renderVideoQueue(queue) {
+    const container = document.getElementById("videoQueueList");
+    if (!queue || queue.length === 0) {
+        container.innerHTML = '<p class="empty-hint">暂无队列任务</p>';
+        return;
+    }
+
+    const statusMap = {
+        pending: "等待提交",
+        submitted: "已提交",
+        generating: "生成中",
+        completed: "已完成",
+        failed: "失败",
+    };
+    const statusClassMap = {
+        pending: "status-pending",
+        submitted: "status-submitted",
+        generating: "status-generating",
+        completed: "status-completed",
+        failed: "status-failed",
+    };
+
+    let html = "";
+    queue.forEach((task) => {
+        const statusText = statusMap[task.status] || task.status;
+        const statusClass = statusClassMap[task.status] || "";
+        const timeStr = task.updated_at
+            ? new Date(task.updated_at * 1000).toLocaleTimeString()
+            : "";
+        html += `
+        <div class="video-queue-item ${statusClass}" data-task-id="${task.task_id}">
+            <div class="queue-item-info">
+                <span class="queue-scene-id">${task.scene_id}</span>
+                <span class="queue-status ${statusClass}">${statusText}</span>
+                <span class="queue-time">${timeStr}</span>
+            </div>
+            <div class="queue-item-actions">
+                <button class="btn btn-small btn-check-video" data-task-id="${task.task_id}" title="检查状态">🔍 检查</button>
+                <button class="btn btn-small btn-danger btn-remove-queue" data-task-id="${task.task_id}" title="移除任务">🗑️ 移除</button>
+            </div>
+            ${task.error ? `<div class="queue-error">${task.error}</div>` : ""}
+            ${task.status === "completed" && task.local_path
+                ? `<div class="queue-path">${task.local_path}</div>`
+                : ""}
+        </div>`;
+    });
+    container.innerHTML = html;
+
+    // 绑定检查按钮
+    container.querySelectorAll(".btn-check-video").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const taskId = btn.dataset.taskId;
+            await checkVideoTask(taskId);
+        });
+    });
+
+    // 绑定移除按钮
+    container.querySelectorAll(".btn-remove-queue").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const taskId = btn.dataset.taskId;
+            if (!confirm(`确定要移除任务 ${taskId} 吗？`)) return;
+            await removeVideoTask(taskId);
+        });
+    });
+}
+
+async function checkVideoTask(taskId) {
+    showStatus("videoStatus", `正在检查任务 ${taskId}...`, "loading");
+    try {
+        const result = await apiFetch(`/api/video/check/${taskId}`);
+        if (result.success) {
+            showStatus("videoStatus", `任务 ${taskId}: ${result.status || "未知"}`, "success");
+            loadVideoQueue();
+        } else {
+            showStatus("videoStatus", result.error || "检查失败", "error");
+        }
+    } catch (e) {
+        showStatus("videoStatus", "请求失败: " + e.message, "error");
+    }
+}
+
+async function removeVideoTask(taskId) {
+    showStatus("videoStatus", `正在移除任务 ${taskId}...`, "loading");
+    try {
+        const result = await apiFetch(`/api/video/queue/${taskId}`, { method: "DELETE" });
+        if (result.success) {
+            showStatus("videoStatus", result.message || "任务已移除", "success");
+            loadVideoQueue();
+        } else {
+            showStatus("videoStatus", result.error || "移除失败", "error");
+        }
+    } catch (e) {
+        showStatus("videoStatus", "请求失败: " + e.message, "error");
+    }
+}
+
+// 加载队列状态
+async function loadVideoQueue() {
+    try {
+        const result = await apiFetch("/api/video/queue");
+        if (result.success) {
+            renderVideoQueue(result.queue);
+        }
+    } catch (e) {
+        console.error("加载队列失败:", e);
+    }
+}
+
 // 刷新按钮
 document.getElementById("btnRefreshVideos").addEventListener("click", () => {
     loadVideoData();
+    loadVideoQueue();
     showStatus("videoStatus", "视频列表已刷新", "success");
+});
+
+// 导出剪映草稿按钮
+document.getElementById("btnExportJianying").addEventListener("click", async () => {
+    if (!currentVideos || currentVideos.length === 0) {
+        showStatus("videoStatus", "暂无视频数据，请先生成视频", "error");
+        return;
+    }
+    showStatus("videoStatus", "正在导出剪映草稿...", "loading");
+    try {
+        const result = await apiFetch("/api/video/export-jianying", { method: "POST" });
+        if (result.success) {
+            showStatus("videoStatus", `剪映草稿已导出: ${result.draft_name}`, "success");
+            // 询问是否打开文件夹
+            if (confirm("剪映草稿导出成功，是否打开所在文件夹？")) {
+                apiFetch("/api/open-file", {
+                    method: "POST",
+                    body: JSON.stringify({ path: result.draft_folder }),
+                }).catch((e) => console.error("打开文件夹失败:", e));
+            }
+        } else {
+            showStatus("videoStatus", result.error || "导出失败", "error");
+        }
+    } catch (e) {
+        showStatus("videoStatus", "导出请求失败: " + e.message, "error");
+    }
 });
 
 // 播放全部按钮
@@ -1472,29 +1889,27 @@ function hideTimelinePreview() {
 }
 
 // ============ 图片预览 ============
-let imagePreviewTimer = null;
 
 function showImagePreview(src) {
-    // 清除之前的定时器，防止闪烁
-    if (imagePreviewTimer) {
-        clearTimeout(imagePreviewTimer);
-        imagePreviewTimer = null;
+    let preview = document.getElementById("imagePreview");
+    if (preview && preview.classList.contains("show")) {
+        // 如果已显示，点击同一张图则关闭
+        if (preview.querySelector("img").src === src) {
+            hideImagePreview();
+            return;
+        }
+        // 否则更换图片
+        preview.querySelector("img").src = src;
+        return;
     }
 
-    let preview = document.getElementById("imagePreview");
     if (!preview) {
         preview = document.createElement("div");
         preview.id = "imagePreview";
         preview.className = "image-preview";
         preview.innerHTML = '<img src="" alt="预览">';
-        // 阻止预览层上的鼠标事件穿透到底层
-        preview.addEventListener('mouseenter', () => {
-            if (imagePreviewTimer) {
-                clearTimeout(imagePreviewTimer);
-                imagePreviewTimer = null;
-            }
-        });
-        preview.addEventListener('mouseleave', () => {
+        // 点击预览图关闭
+        preview.addEventListener('click', () => {
             hideImagePreview();
         });
         document.body.appendChild(preview);
@@ -1504,14 +1919,10 @@ function showImagePreview(src) {
 }
 
 function hideImagePreview() {
-    // 延迟隐藏，避免快速移动时闪烁
-    imagePreviewTimer = setTimeout(() => {
-        const preview = document.getElementById("imagePreview");
-        if (preview) {
-            preview.classList.remove("show");
-        }
-        imagePreviewTimer = null;
-    }, 100);
+    const preview = document.getElementById("imagePreview");
+    if (preview) {
+        preview.classList.remove("show");
+    }
 }
 
 // ============ 大图预览 ============

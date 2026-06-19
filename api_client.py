@@ -35,36 +35,81 @@ def _get_current_model() -> str:
     return DEEPSEEK_MODEL
 
 
-def call_deepseek(system_prompt: str, user_prompt: str, temperature: float = 0.7, purpose: str = "chat") -> str:
+def call_deepseek(system_prompt: str, user_prompt: str, temperature: float = 0.7, purpose: str = "chat", stream_callback=None) -> str:
     """调用 LLM API（根据 TEXT_ENGINE 自动选择引擎）"""
     if TEXT_ENGINE == "ark":
-        return _call_ark_deepseek(system_prompt, user_prompt, temperature, purpose)
+        return _call_ark_deepseek(system_prompt, user_prompt, temperature, purpose, stream_callback)
     if TEXT_ENGINE == "agnes":
-        return _call_agnes(system_prompt, user_prompt, temperature, purpose)
-    return _call_deepseek_direct(system_prompt, user_prompt, temperature, purpose)
+        return _call_agnes(system_prompt, user_prompt, temperature, purpose, stream_callback)
+    return _call_deepseek_direct(system_prompt, user_prompt, temperature, purpose, stream_callback)
 
 
-def _call_deepseek_direct(system_prompt: str, user_prompt: str, temperature: float = 0.7, purpose: str = "chat") -> str:
+def _call_deepseek_direct(system_prompt: str, user_prompt: str, temperature: float = 0.7, purpose: str = "chat", stream_callback=None) -> str:
     """调用 DeepSeek 官方 API（OpenAI 兼容格式）"""
     t0 = time.time()
 
     try:
-        response = client.chat.completions.create(
-            model=_get_current_model(),
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=temperature,
-            max_tokens=8192,
-        )
+        if stream_callback:
+            response = client.chat.completions.create(
+                model=_get_current_model(),
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=temperature,
+                max_tokens=8192,
+                reasoning_effort="high",
+                extra_body={"thinking": {"type": "enabled"}},
+                stream=True,
+            )
+            
+            full_content = ""
+            full_reasoning = ""
+            
+            for chunk in response:
+                if chunk.choices[0].delta.reasoning_content:
+                    full_reasoning += chunk.choices[0].delta.reasoning_content
+                    if stream_callback:
+                        stream_callback({"type": "thinking", "content": chunk.choices[0].delta.reasoning_content})
+                
+                if chunk.choices[0].delta.content:
+                    full_content += chunk.choices[0].delta.content
+                    if stream_callback:
+                        stream_callback({"type": "content", "content": chunk.choices[0].delta.content})
+            
+            response = type('obj', (object,), {
+                'choices': [type('obj', (object,), {
+                    'message': type('obj', (object,), {
+                        'content': full_content,
+                        'reasoning_content': full_reasoning
+                    })
+                })],
+                'usage': None
+            })
+        else:
+            response = client.chat.completions.create(
+                model=_get_current_model(),
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=temperature,
+                max_tokens=8192,
+                reasoning_effort="high",
+                extra_body={"thinking": {"type": "enabled"}}
+            )
     except Exception as e:
         log_error("DeepSeek", str(e))
         raise
 
     elapsed = time.time() - t0
     content = response.choices[0].message.content
+    reasoning_content = response.choices[0].message.reasoning_content if hasattr(response.choices[0].message, 'reasoning_content') else None
     usage = response.usage
+    
+    if reasoning_content:
+        log_debug(f"[LLM 思考内容] {purpose}:\n{reasoning_content}")
+    
     log_llm_call(
         model=_get_current_model(),
         purpose=purpose,
@@ -73,17 +118,23 @@ def _call_deepseek_direct(system_prompt: str, user_prompt: str, temperature: flo
         duration=elapsed,
     )
     log_llm_response(purpose, content)
+    
+    if reasoning_content:
+        full_response = f"【思考内容】\n{reasoning_content}\n\n【最终回答】\n{content}"
+    else:
+        full_response = content
+    
     log_llm_full_io(
         purpose=purpose,
         system_prompt=system_prompt,
         user_prompt=user_prompt,
-        response=content,
+        response=full_response,
         model=_get_current_model(),
     )
     return content
 
 
-def _call_ark_deepseek(system_prompt: str, user_prompt: str, temperature: float = 0.7, purpose: str = "chat") -> str:
+def _call_ark_deepseek(system_prompt: str, user_prompt: str, temperature: float = 0.7, purpose: str = "chat", stream_callback=None) -> str:
     """调用豆包 Ark DeepSeek API（Responses API 格式）"""
     t0 = time.time()
 
@@ -146,7 +197,7 @@ def _call_ark_deepseek(system_prompt: str, user_prompt: str, temperature: float 
     return content
 
 
-def _call_agnes(system_prompt: str, user_prompt: str, temperature: float = 0.7, purpose: str = "chat") -> str:
+def _call_agnes(system_prompt: str, user_prompt: str, temperature: float = 0.7, purpose: str = "chat", stream_callback=None) -> str:
     """调用 Agnes AI API（OpenAI 兼容格式）"""
     t0 = time.time()
 
@@ -219,39 +270,17 @@ def generate_script(creative: str, option_id: str, aspect_ratio: str = "16:9") -
 
 # ============ 分镜生成相关 ============
 
-STORYBOARD_USER_PROMPT = """请根据以下剧本生成分镜脚本，以JSON数组格式返回。
-
-【画幅比例】{aspect_ratio}
-
-【输出格式】
-严格JSON数组，每个元素含：
-- group_id: 场景编号，如"001"
-- scene_id: 分镜编号，如"001"
-- desc: 分镜标题
-- duration: 整数秒数
-- prompt_img_start: 首帧图提示词（生成时留空）
-- prompt_img_end: 尾帧图提示词（生成时留空）
-- prompt_video: 视频提示词
-- narration: 对白/旁白（中文原文）
-- img_start: 首帧图路径（生成时留空）
-- img_end: 尾帧图路径（生成时留空）
-- video: 视频路径（生成时留空）
-- name_en_list: 角色英文名数组，同一角色多年龄段用_young/_old后缀区分，无原生英文名用拼音+下划线命名。
-
-【注意事项】
-- group_id/scene_id 用3位数字，如"001"
-- duration 为整数
-- 直接返回JSON数组，不要markdown代码块标记
-
+STORYBOARD_USER_PROMPT = """
+请根据下方剧本内容，按照你已掌握的所有规则生成标准分镜JSON数组：
 【剧本内容】
-{script}"""
+{script}
+"""
 
 
 def generate_storyboard(script: str, aspect_ratio: str = "16:9", art_style: str = "电影级超写实") -> str:
     """根据剧本和画幅比例生成分镜脚本"""
-    system_prompt = STORYBOARD_SYSTEM_PROMPT.replace("{aspect_ratio}", aspect_ratio)
-    system_prompt = system_prompt.replace("{art_style}", art_style)
-    user_prompt = STORYBOARD_USER_PROMPT.replace("{aspect_ratio}", aspect_ratio)
+    system_prompt = STORYBOARD_SYSTEM_PROMPT.replace("{aspect_ratio}", aspect_ratio).replace("{art_style}", art_style)
+    user_prompt = STORYBOARD_USER_PROMPT.replace("{aspect_ratio}", aspect_ratio).replace("{art_style}", art_style)
     user_prompt = user_prompt.replace("{script}", script)
     purpose = "生成分镜脚本"
     log_llm_call(model=_get_current_model(), purpose=purpose, prompt_len=len(user_prompt), response_len=0)
@@ -260,17 +289,16 @@ def generate_storyboard(script: str, aspect_ratio: str = "16:9", art_style: str 
 
 # ============ 角色提取相关 ============
 
-CHARACTER_EXTRACT_PROMPT = """【画幅比例】{aspect_ratio}
-
+CHARACTER_EXTRACT_PROMPT = """【画幅比例】{aspect_ratio}，{art_style}
 【分镜脚本】
 {storyboard}
 
 请从以上分镜脚本中提取角色，按System Prompt指定的格式返回JSON数组。"""
 
 
-def extract_characters(storyboard_json: str, aspect_ratio: str = "16:9") -> str:
+def extract_characters(storyboard_json: str, aspect_ratio: str = "16:9", art_style: str = "电影级超写实") -> str:
     """从分镜脚本中提取角色"""
-    user_prompt = CHARACTER_EXTRACT_PROMPT.replace("{aspect_ratio}", aspect_ratio)
+    user_prompt = CHARACTER_EXTRACT_PROMPT.replace("{aspect_ratio}", aspect_ratio).replace("{art_style}", art_style)
     user_prompt = user_prompt.replace("{storyboard}", storyboard_json)
     purpose = "提取角色"
     log_llm_call(model=_get_current_model(), purpose=purpose, prompt_len=len(user_prompt), response_len=0)
@@ -284,17 +312,16 @@ def extract_characters(storyboard_json: str, aspect_ratio: str = "16:9") -> str:
 
 # ============ 分镜首帧图提示词生成 ============
 
-IMG_PROMPT_USER = """【画幅比例】{aspect_ratio}
-
+IMG_PROMPT_USER = """【画幅比例】{aspect_ratio}，{art_style}
 【视频提示词】
 {prompt_video}
 
 请提取首帧静态视觉要素，生成同风格同画幅的绘图提示词。"""
 
 
-def generate_img_prompt(prompt_video: str, aspect_ratio: str = "16:9") -> str:
+def generate_img_prompt(prompt_video: str, aspect_ratio: str = "16:9", art_style: str = "电影级超写实") -> str:
     """根据视频提示词和画幅比例生成首帧图提示词"""
-    user_prompt = IMG_PROMPT_USER.replace("{aspect_ratio}", aspect_ratio)
+    user_prompt = IMG_PROMPT_USER.replace("{aspect_ratio}", aspect_ratio).replace("{art_style}", art_style)
     user_prompt = user_prompt.replace("{prompt_video}", prompt_video)
     purpose = "生成首帧图提示词"
     log_llm_call(model=_get_current_model(), purpose=purpose, prompt_len=len(user_prompt), response_len=0)

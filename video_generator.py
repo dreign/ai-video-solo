@@ -6,12 +6,63 @@ import time
 import base64
 from pathlib import Path
 import requests
-from config import (
-    COMFYUI_HOST, COMFYUI_OUTPUT_DIR, VIDEO_WORKFLOW_PATH, IMAGE_Z_IMAGE_TURBO_WORKFLOW_PATH,
-    VIDEO_ENGINE, ARK_API_KEY, ARK_VIDEO_MODEL, ARK_VIDEO_ENDPOINT,
-    AGNES_API_KEY, AGNES_VIDEO_MODEL, AGNES_VIDEO_ENDPOINT
-)
+import config as app_config
 from logger import log_step, log_video_gen, log_api_call, log_api_full_io, log_error, log_debug, log_warn, log_info
+
+
+def _get_comfyui_host():
+    """动态获取 ComfyUI Host，支持热更新"""
+    return getattr(app_config, "COMFYUI_HOST", "http://127.0.0.1:8000")
+
+
+def _get_comfyui_output_dir():
+    """动态获取 ComfyUI 输出目录，支持热更新"""
+    return getattr(app_config, "COMFYUI_OUTPUT_DIR", "")
+
+
+def _get_video_workflow_path():
+    """动态获取视频工作流路径，支持热更新"""
+    return getattr(app_config, "VIDEO_WORKFLOW_PATH", "")
+
+
+def _get_image_workflow_path():
+    """动态获取图片工作流路径，支持热更新"""
+    return getattr(app_config, "IMAGE_Z_IMAGE_TURBO_WORKFLOW_PATH", "")
+
+
+def _get_ark_api_key():
+    """动态获取 Ark API Key，支持热更新"""
+    return getattr(app_config, "ARK_API_KEY", "")
+
+
+def _get_ark_video_model():
+    """动态获取 Ark 视频模型，支持热更新"""
+    return getattr(app_config, "ARK_VIDEO_MODEL", "doubao-seedance-2-0-fast-260128")
+
+
+def _get_ark_video_endpoint():
+    """动态获取 Ark 视频端点，支持热更新"""
+    return getattr(app_config, "ARK_VIDEO_ENDPOINT", "")
+
+
+def _get_video_engine():
+    """动态获取视频引擎，支持热更新"""
+    return getattr(app_config, "VIDEO_ENGINE", "agnes")
+
+
+def _get_agnes_api_key():
+    """动态获取 Agnes API Key，支持热更新"""
+    return getattr(app_config, "AGNES_API_KEY", "")
+
+
+def _get_agnes_video_model():
+    """动态获取 Agnes 视频模型，支持热更新"""
+    return getattr(app_config, "AGNES_VIDEO_MODEL", "")
+
+
+def _get_agnes_video_endpoint():
+    """动态获取 Agnes 视频端点，支持热更新"""
+    return getattr(app_config, "AGNES_VIDEO_ENDPOINT", "")
 
 
 def load_workflow(path: str) -> dict:
@@ -27,14 +78,15 @@ def upload_image_to_comfyui(image_path: str) -> str:
     """上传图片到 ComfyUI"""
     t0 = time.time()
     image_name = Path(image_path).name
-    url = f"{COMFYUI_HOST}/upload/image"
+    comfyui_host = _get_comfyui_host()
+    url = f"{comfyui_host}/upload/image"
     log_debug(f"上传图片到 ComfyUI: {image_path}")
 
     try:
         with open(image_path, "rb") as f:
             files = {"image": (image_name, f)}
             data = {"overwrite": "true"}
-            response = requests.post(url, files=files, data=data, timeout=30)
+            response = requests.post(url, files=files, data=data, timeout=3600)
     except Exception as e:
         log_error("ComfyUI", f"上传图片失败(网络): {str(e)}")
         raise
@@ -51,11 +103,12 @@ def upload_image_to_comfyui(image_path: str) -> str:
 def queue_prompt(prompt_dict: dict) -> str:
     """提交工作流到 ComfyUI 队列"""
     t0 = time.time()
-    url = f"{COMFYUI_HOST}/prompt"
+    comfyui_host = _get_comfyui_host()
+    url = f"{comfyui_host}/prompt"
     log_debug(f"提交工作流到 ComfyUI，节点数: {len(prompt_dict)}")
 
     try:
-        response = requests.post(url, json={"prompt": prompt_dict}, timeout=30)
+        response = requests.post(url, json={"prompt": prompt_dict}, timeout=3600)
     except Exception as e:
         log_error("ComfyUI", f"提交工作流失败(网络): {str(e)}")
         raise
@@ -81,12 +134,13 @@ def queue_prompt(prompt_dict: dict) -> str:
 
 def get_history(prompt_id: str) -> dict:
     """获取工作流执行历史"""
-    url = f"{COMFYUI_HOST}/history/{prompt_id}"
-    response = requests.get(url, timeout=10)
+    comfyui_host = _get_comfyui_host()
+    url = f"{comfyui_host}/history/{prompt_id}"
+    response = requests.get(url, timeout=3600)
     return response.json()
 
 
-def wait_for_completion(prompt_id: str, timeout: int = 1800) -> dict:
+def wait_for_completion(prompt_id: str, timeout: int = 3600) -> dict:
     """等待工作流执行完成"""
     log_info(f"等待 ComfyUI 工作流完成，prompt_id={prompt_id}，超时={timeout}s")
     start_time = time.time()
@@ -124,9 +178,10 @@ def wait_for_completion(prompt_id: str, timeout: int = 1800) -> dict:
 
 def get_latest_output(ext_patterns: list) -> Path:
     """获取 ComfyUI 输出目录中最新的输出文件"""
-    comfy_output = Path(COMFYUI_OUTPUT_DIR)
+    comfyui_output_dir = _get_comfyui_output_dir()
+    comfy_output = Path(comfyui_output_dir)
     if not comfy_output.exists():
-        log_warn("ComfyUI", f"输出目录不存在: {COMFYUI_OUTPUT_DIR}")
+        log_warn("ComfyUI", f"输出目录不存在: {comfyui_output_dir}")
         return None
     files = []
     for ext in ext_patterns:
@@ -211,12 +266,15 @@ def generate_video_seedance(
 
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {ARK_API_KEY}",
+        "Authorization": f"Bearer {_get_ark_api_key()}",
     }
+
+    ark_video_endpoint = _get_ark_video_endpoint()
+    ark_video_model = _get_ark_video_model()
 
     # 构建请求体
     body = {
-        "model": ARK_VIDEO_MODEL,
+        "model": ark_video_model,
         "prompt": prompt,
         "image": f"data:image/png;base64,{image_base64}",
         "ratio": "9:16" if "9:16" in prompt or "竖版" in prompt else "16:9",
@@ -227,10 +285,10 @@ def generate_video_seedance(
 
     try:
         response = requests.post(
-            ARK_VIDEO_ENDPOINT,
+            ark_video_endpoint,
             headers=headers,
             json=body,
-            timeout=300,
+            timeout=3600,
         )
     except Exception as e:
         log_error("Seedance", f"API 请求失败: {str(e)}")
@@ -240,7 +298,7 @@ def generate_video_seedance(
     log_api_call(
         api_name="Seedance",
         method="POST",
-        url=ARK_VIDEO_ENDPOINT,
+        url=ark_video_endpoint,
         status_code=response.status_code,
         duration=elapsed_api,
     )
@@ -249,7 +307,7 @@ def generate_video_seedance(
         log_api_full_io(
             api_name="Seedance",
             method="POST",
-            url=ARK_VIDEO_ENDPOINT,
+            url=ark_video_endpoint,
             request_body=body,
             response_body=response.text,
             status_code=response.status_code,
@@ -261,7 +319,7 @@ def generate_video_seedance(
     log_api_full_io(
         api_name="Seedance",
         method="POST",
-        url=ARK_VIDEO_ENDPOINT,
+        url=ark_video_endpoint,
         request_body=body,
         response_body=response.text,
         status_code=response.status_code,
@@ -277,7 +335,7 @@ def generate_video_seedance(
 
     # 下载视频
     try:
-        video_response = requests.get(video_url, timeout=120)
+        video_response = requests.get(video_url, timeout=3600)
     except Exception as e:
         log_error("Seedance", f"视频下载失败: {str(e)}")
         raise
@@ -313,15 +371,17 @@ def _file_to_data_uri(file_path: str) -> str:
 
 def _create_agnes_video_task(body: dict) -> dict:
     """创建 Agnes 视频生成任务，返回包含 task_id 的响应"""
+    agnes_api_key = _get_agnes_api_key()
+    agnes_video_endpoint = _get_agnes_video_endpoint()
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {AGNES_API_KEY}",
+        "Authorization": f"Bearer {agnes_api_key}",
     }
     response = requests.post(
-        AGNES_VIDEO_ENDPOINT,
+        agnes_video_endpoint,
         headers=headers,
         json=body,
-        timeout=300,
+        timeout=3600,
     )
     if response.status_code != 200:
         log_error("Agnes", f"创建任务失败 status={response.status_code}", response.text[:500])
@@ -329,15 +389,17 @@ def _create_agnes_video_task(body: dict) -> dict:
     return response.json()
 
 
-def _poll_agnes_video_task(task_id: str, timeout: int = 1800) -> str:
+def _poll_agnes_video_task(task_id: str, timeout: int = 3600) -> str:
     """轮询 Agnes 视频任务状态，返回视频 URL"""
-    url = f"{AGNES_VIDEO_ENDPOINT}/{task_id}"
-    headers = {"Authorization": f"Bearer {AGNES_API_KEY}"}
+    agnes_api_key = _get_agnes_api_key()
+    agnes_video_endpoint = _get_agnes_video_endpoint()
+    url = f"{agnes_video_endpoint}/{task_id}"
+    headers = {"Authorization": f"Bearer {agnes_api_key}"}
     start = time.time()
     last_log = start
 
     while time.time() - start < timeout:
-        resp = requests.get(url, headers=headers, timeout=30)
+        resp = requests.get(url, headers=headers, timeout=3600)
         if resp.status_code != 200:
             log_warn("Agnes", f"查询任务状态失败: {resp.status_code}")
             time.sleep(5)
@@ -396,7 +458,7 @@ def generate_video_agnes(
         num_frames = num_frames + (8 - remainder)
 
     body = {
-        "model": AGNES_VIDEO_MODEL,
+        "model": _get_agnes_video_model(),
         "prompt": prompt,
         "width": 1152,
         "height": 768,
@@ -424,7 +486,7 @@ def generate_video_agnes(
 
     # 下载视频
     try:
-        video_response = requests.get(video_url, timeout=120)
+        video_response = requests.get(video_url, timeout=3600)
     except Exception as e:
         log_error("Agnes", f"视频下载失败: {str(e)}")
         raise
@@ -471,7 +533,8 @@ def generate_video(
     Returns:
         生成的视频文件路径
     """
-    if VIDEO_ENGINE == "doubao":
+    video_engine = _get_video_engine()
+    if video_engine == "doubao":
         log_debug(f"使用豆包 Seedance 生成视频: scene_id={scene_id}")
         return generate_video_seedance(
             image_path=image_path,
@@ -480,7 +543,7 @@ def generate_video(
             output_dir=output_dir,
             scene_id=scene_id,
         )
-    elif VIDEO_ENGINE == "agnes":
+    elif video_engine == "agnes":
         log_debug(f"使用 Agnes AI 生成视频: scene_id={scene_id}")
         return generate_video_agnes(
             image_path=image_path,
@@ -530,7 +593,7 @@ def generate_video_comfyui(
     image_name = upload_image_to_comfyui(image_path)
 
     # 加载并修改工作流
-    workflow = load_workflow(VIDEO_WORKFLOW_PATH)
+    workflow = load_workflow(_get_video_workflow_path())
     output_prefix = f"solo_video_{scene_id}"
     modified_workflow = modify_video_workflow(workflow, image_name, prompt, duration, output_prefix)
 
@@ -621,7 +684,7 @@ def generate_image_via_comfyui(
         width, height = 1920, 1080
 
     # 加载并修改工作流
-    workflow = load_workflow(IMAGE_Z_IMAGE_TURBO_WORKFLOW_PATH)
+    workflow = load_workflow(_get_image_workflow_path())
     output_prefix = f"solo_img_{scene_id}"
     modified_workflow = modify_z_image_workflow(workflow, prompt, width, height, output_prefix)
 

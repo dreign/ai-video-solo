@@ -77,7 +77,7 @@ def generate_image_seedream(prompt: str, reference_image_path: str = None, outpu
             ARK_IMAGE_ENDPOINT,
             headers=headers,
             json=body,
-            timeout=120,
+            timeout=3600,
         )
     except Exception as e:
         log_error("Seedream", f"API 请求失败: {str(e)}")
@@ -127,7 +127,7 @@ def generate_image_seedream(prompt: str, reference_image_path: str = None, outpu
 
     # 下载图片
     try:
-        img_response = requests.get(image_url, timeout=60)
+        img_response = requests.get(image_url, timeout=3600)
     except Exception as e:
         log_error("Seedream", f"图片下载失败: {str(e)}")
         raise
@@ -229,7 +229,7 @@ def generate_image_agnes(prompt: str, reference_image_path: str = None, output_p
             AGNES_IMAGE_ENDPOINT,
             headers=headers,
             json=body,
-            timeout=120,
+            timeout=3600,
         )
     except Exception as e:
         log_error("Agnes", f"API 请求失败: {str(e)}")
@@ -281,7 +281,7 @@ def generate_image_agnes(prompt: str, reference_image_path: str = None, output_p
 
     # 下载图片
     try:
-        img_response = requests.get(image_url, timeout=60)
+        img_response = requests.get(image_url, timeout=3600)
     except Exception as e:
         log_error("Agnes", f"图片下载失败: {str(e)}")
         raise

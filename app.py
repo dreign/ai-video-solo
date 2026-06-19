@@ -9,7 +9,7 @@ from flask_cors import CORS
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config import SOLO_DIR, PROJECTS_DIR, PROJECTS_INDEX, FLASK_HOST, FLASK_PORT, FLASK_DEBUG, IMAGE_ENGINE
+from config import SOLO_DIR, PROJECTS_DIR, PROJECTS_INDEX, FLASK_HOST, FLASK_PORT, FLASK_DEBUG, IMAGE_ENGINE, VIDEO_ENGINE
 from api_client import (
     generate_script,
     generate_storyboard,
@@ -23,6 +23,8 @@ from video_generator import generate_video, generate_image_via_comfyui
 from logger import (
     log_step, log_llm_call, log_api_call, log_error, log_warn, log_info, log_debug,
 )
+from jianying_export import create_jianying_draft
+from video_queue import add_to_queue, get_queue, start_queue_worker
 
 
 def generate_image_by_engine(prompt: str, aspect_ratio: str, output_dir: str, scene_id: str, reference_image_path: str = None, engine: str = None) -> str:
@@ -175,6 +177,7 @@ def api_poems_list():
 # ============ 项目管理 API ============
 @app.route("/api/projects/list", methods=["GET"])
 def api_projects_list():
+    log_debug("获取项目列表")
     projects = load_projects_index()
     return jsonify({"projects": projects, "current_id": current_project_id})
 
@@ -318,12 +321,84 @@ def api_generate_script():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route("/api/script/generate-stream", methods=["POST"])
+def api_generate_script_stream():
+    from flask import Response, stream_with_context
+    import queue
+    import time
+    data = request.get_json()
+    paths = _require_paths()
+    if not paths:
+        return jsonify({"success": False, "error": "请先创建或选择项目"}), 400
+
+    creative = data.get("creative", "")
+    option_id = data.get("option_id", "1")
+    aspect_ratio = data.get("aspect_ratio", "16:9")
+    art_style = data.get("art_style", "电影级超写实")
+
+    option_name = SCRIPT_OPTIONS.get(option_id, {}).get("name", option_id)
+    log_step("生成剧本(流式)", "开始", f"option={option_name} | 画幅={aspect_ratio} | 风格={art_style} | 创意长度={len(creative)}")
+
+    if not creative:
+        log_warn("生成剧本", "创意为空")
+        return jsonify({"success": False, "error": "请先输入创意"}), 400
+
+    option = SCRIPT_OPTIONS.get(option_id, SCRIPT_OPTIONS["1"])
+    user_prompt = option["user_prompt_template"].replace("{aspect_ratio}", aspect_ratio).replace("{creative}", creative)
+
+    result_queue = queue.Queue()
+
+    def llm_thread():
+        try:
+            def stream_callback(chunk):
+                result_queue.put(chunk)
+            
+            script = call_deepseek(option["system_prompt"], user_prompt, temperature=0.7, purpose="生成剧本", stream_callback=stream_callback)
+            write_file(paths["script"], script)
+            write_json(paths["option"], {
+                "option_id": option_id,
+                "option_name": SCRIPT_OPTIONS.get(option_id, {}).get("name", ""),
+                "aspect_ratio": aspect_ratio,
+                "art_style": art_style,
+            })
+            result_queue.put({"type": "done", "script": script})
+        except Exception as e:
+            log_error("生成剧本(流式)", str(e))
+            result_queue.put({"type": "error", "error": str(e)})
+
+    import threading
+    thread = threading.Thread(target=llm_thread)
+    thread.start()
+
+    def generate():
+        while True:
+            try:
+                chunk = result_queue.get(timeout=120)
+                yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                time.sleep(0.01)
+                if chunk["type"] == "done" or chunk["type"] == "error":
+                    break
+            except queue.Empty:
+                break
+    
+    return Response(
+        stream_with_context(generate()),
+        content_type="text/event-stream; charset=utf-8",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*"
+        }
+    )
+
+
 @app.route("/api/script/load", methods=["GET"])
 def load_script():
     paths = _require_paths()
     if not paths:
         return jsonify({"script": ""})
     script = read_file(paths["script"])
+    log_debug(f"加载剧本: {len(script)} chars")
     return jsonify({"script": script})
 
 
@@ -401,17 +476,18 @@ def api_extract_characters():
         return jsonify({"success": False, "error": "请先创建或选择项目"}), 400
 
     storyboard = read_json(paths["storyboard"])
-    option = read_json(paths["option"], {"aspect_ratio": "16:9"})
+    option = read_json(paths["option"], {"aspect_ratio": "16:9", "art_style": "电影级超写实"})
     aspect_ratio = option.get("aspect_ratio", "16:9")
+    art_style = option.get("art_style", "电影级超写实")
 
-    log_step("提取角色", "开始", f"分镜数={len(storyboard)} | 画幅={aspect_ratio}")
+    log_step("提取角色", "开始", f"分镜数={len(storyboard)} | 画幅={aspect_ratio} | 风格={art_style}")
 
     if not storyboard:
         log_warn("提取角色", "分镜为空")
         return jsonify({"success": False, "error": "请先生成分镜脚本"}), 400
 
     try:
-        response = extract_characters(json.dumps(storyboard, ensure_ascii=False), aspect_ratio)
+        response = extract_characters(json.dumps(storyboard, ensure_ascii=False), aspect_ratio, art_style)
         characters = parse_json_response(response)
         write_json(paths["character"], characters)
         elapsed = time.time() - t0
@@ -428,7 +504,21 @@ def load_characters():
     if not paths:
         return jsonify({"characters": []})
     characters = read_json(paths["character"])
+    log_debug(f"加载角色: {len(characters)} 个")
     return jsonify({"characters": characters})
+
+
+@app.route("/api/character/save", methods=["POST"])
+def api_save_characters():
+    """保存角色数据"""
+    data = request.get_json()
+    paths = _require_paths()
+    if not paths:
+        return jsonify({"success": False, "error": "请先创建或选择项目"}), 400
+    characters = data.get("characters", [])
+    log_step("保存角色", "执行", f"角色数={len(characters)}")
+    write_json(paths["character"], characters)
+    return jsonify({"success": True, "message": "角色已保存"})
 
 
 @app.route("/api/character/generate-images", methods=["POST"])
@@ -479,6 +569,49 @@ def api_generate_character_images():
     return jsonify({"success": True, "results": results})
 
 
+@app.route("/api/character/generate-image/<char_id>", methods=["POST"])
+def api_generate_single_character_image(char_id):
+    """重新生成单个角色图"""
+    t0 = time.time()
+    paths = _require_paths()
+    if not paths:
+        return jsonify({"success": False, "error": "请先创建或选择项目"}), 400
+
+    characters = read_json(paths["character"])
+    option = read_json(paths["option"], {"aspect_ratio": "16:9"})
+    aspect_ratio = option.get("aspect_ratio", "16:9")
+
+    char = None
+    for c in characters:
+        if c.get("id") == char_id:
+            char = c
+            break
+
+    if not char:
+        return jsonify({"success": False, "error": f"角色 {char_id} 不存在"}), 404
+    if not char.get("prompt"):
+        return jsonify({"success": False, "error": "角色无提示词"}), 400
+
+    os.makedirs(paths["character_img"], exist_ok=True)
+
+    log_step("重新生成角色图", "执行", f"角色id={char_id} | name={char.get('name_cn', '?')}")
+    try:
+        img_path = generate_image_by_engine(
+            prompt=char["prompt"],
+            aspect_ratio=aspect_ratio,
+            output_dir=paths["character_img"],
+            scene_id=f"char_{char_id}",
+        )
+        char["img"] = img_path
+        write_json(paths["character"], characters)
+        elapsed = time.time() - t0
+        log_step("重新生成角色图", "完成", f"角色id={char_id} | elapsed={elapsed:.1f}s")
+        return jsonify({"success": True, "img": img_path, "character": char})
+    except Exception as e:
+        log_error("重新生成角色图", str(e), f"角色id={char_id}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 # ============ 分镜首帧图提示词 API ============
 @app.route("/api/storyboard/generate-img-prompts", methods=["POST"])
 def api_generate_img_prompts():
@@ -488,10 +621,11 @@ def api_generate_img_prompts():
         return jsonify({"success": False, "error": "请先创建或选择项目"}), 400
 
     storyboard = read_json(paths["storyboard"])
-    option = read_json(paths["option"], {"aspect_ratio": "16:9"})
+    option = read_json(paths["option"], {"aspect_ratio": "16:9", "art_style": "电影级超写实"})
     aspect_ratio = option.get("aspect_ratio", "16:9")
+    art_style = option.get("art_style", "电影级超写实")
 
-    log_step("生成首帧图提示词", "开始", f"分镜数={len(storyboard)} | 画幅={aspect_ratio}")
+    log_step("生成首帧图提示词", "开始", f"分镜数={len(storyboard)} | 画幅={aspect_ratio} | 风格={art_style}")
 
     if not storyboard:
         log_warn("生成首帧图提示词", "分镜为空")
@@ -508,7 +642,7 @@ def api_generate_img_prompts():
 
         log_step("生成首帧图提示词", "执行", f"scene_id={scene_id}")
         try:
-            img_prompt = generate_img_prompt(prompt_video, aspect_ratio)
+            img_prompt = generate_img_prompt(prompt_video, aspect_ratio, art_style)
             scene["prompt_img_start"] = img_prompt
             results.append({"scene_id": scene_id, "status": "success"})
         except Exception as e:
@@ -532,9 +666,9 @@ def api_generate_storyboard_images():
 
     storyboard = read_json(paths["storyboard"])
     characters = read_json(paths["character"])
-    option = read_json(paths["option"], {"aspect_ratio": "16:9"})
+    option = read_json(paths["option"], {"aspect_ratio": "16:9", "art_style": "电影级超写实"})
 
-    log_step("生成分镜首帧图", "开始", f"分镜数={len(storyboard)} | 角色数={len(characters)}")
+    log_step("生成分镜首帧图", "开始", f"分镜数={len(storyboard)} | 角色数={len(characters)} | 风格={option.get('art_style', '电影级超写实')}")
 
     if not storyboard:
         log_warn("生成分镜首帧图", "分镜为空")
@@ -589,17 +723,76 @@ def api_generate_storyboard_images():
     return jsonify({"success": True, "results": results, "storyboard": storyboard})
 
 
-# ============ 分镜视频生成 API ============
-@app.route("/api/storyboard/generate-videos", methods=["POST"])
-def api_generate_storyboard_videos():
+@app.route("/api/storyboard/generate-image/<scene_id>", methods=["POST"])
+def api_generate_single_storyboard_image(scene_id):
+    """重新生成单个分镜的首帧图"""
     t0 = time.time()
     paths = _require_paths()
     if not paths:
         return jsonify({"success": False, "error": "请先创建或选择项目"}), 400
 
     storyboard = read_json(paths["storyboard"])
+    characters = read_json(paths["character"])
+    option = read_json(paths["option"], {"aspect_ratio": "16:9", "art_style": "电影级超写实"})
 
-    log_step("生成分镜视频", "开始", f"分镜数={len(storyboard)}")
+    scene = None
+    for s in storyboard:
+        if s.get("scene_id") == scene_id:
+            scene = s
+            break
+
+    if not scene:
+        return jsonify({"success": False, "error": f"分镜 {scene_id} 不存在"}), 404
+
+    prompt_img = scene.get("prompt_img_start", "")
+    if not prompt_img:
+        return jsonify({"success": False, "error": "该分镜无首帧图提示词"}), 400
+
+    # 查找关联角色图
+    char_img_map = {}
+    for char in characters:
+        if char.get("name_en") and char.get("img"):
+            char_img_map[char["name_en"]] = char["img"]
+
+    reference_img = None
+    name_list = scene.get("name_en_list", [])
+    for name_en in name_list:
+        if name_en in char_img_map:
+            reference_img = char_img_map[name_en]
+            break
+
+    os.makedirs(paths["storyboard_img"], exist_ok=True)
+
+    log_step("重新生成分镜首帧图", "执行", f"scene_id={scene_id} | 参考图={reference_img or '无'}")
+    try:
+        img_path = generate_image_by_engine(
+            prompt=prompt_img,
+            aspect_ratio=option.get("aspect_ratio", "16:9"),
+            output_dir=paths["storyboard_img"],
+            scene_id=scene_id,
+            reference_image_path=reference_img,
+        )
+        scene["img_start"] = img_path
+        write_json(paths["storyboard"], storyboard)
+        elapsed = time.time() - t0
+        log_step("重新生成分镜首帧图", "完成", f"scene_id={scene_id} | elapsed={elapsed:.1f}s")
+        return jsonify({"success": True, "img": img_path, "scene": scene})
+    except Exception as e:
+        log_error("重新生成分镜首帧图", str(e), f"scene_id={scene_id}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ============ 分镜视频生成 API ============
+@app.route("/api/storyboard/generate-videos", methods=["POST"])
+def api_generate_storyboard_videos():
+    """根据 VIDEO_ENGINE 生成视频：comfyui/doubao 同步处理，agnes 异步队列"""
+    paths = _require_paths()
+    if not paths:
+        return jsonify({"success": False, "error": "请先创建或选择项目"}), 400
+
+    storyboard = read_json(paths["storyboard"])
+
+    log_step("生成分镜视频", "开始", f"分镜数={len(storyboard)}, engine={VIDEO_ENGINE}")
 
     if not storyboard:
         log_warn("生成分镜视频", "分镜为空")
@@ -607,6 +800,71 @@ def api_generate_storyboard_videos():
 
     os.makedirs(paths["video"], exist_ok=True)
 
+    # ========== Agnes 模式：异步队列 ==========
+    if VIDEO_ENGINE == "agnes":
+        results = []
+        for scene in storyboard:
+            scene_id = scene.get("scene_id", "?")
+            img_start = scene.get("img_start", "")
+            prompt_video = scene.get("prompt_video", "")
+            duration = scene.get("duration", 10)
+
+            if not img_start or not os.path.exists(img_start):
+                log_warn("生成分镜视频", f"分镜 {scene_id} 无首帧图或文件不存在: {img_start}")
+                results.append({"scene_id": scene_id, "status": "skip", "reason": "无首帧图"})
+                continue
+
+            if not prompt_video:
+                log_warn("生成分镜视频", f"分镜 {scene_id} 无视频提示词")
+                results.append({"scene_id": scene_id, "status": "skip", "reason": "无视频提示词"})
+                continue
+
+            # 检查是否已有 video_id 在队列中
+            existing_video_id = scene.get("video_id", "")
+            if existing_video_id:
+                from video_queue import get_task
+                existing_task = get_task(existing_video_id)
+                if existing_task and existing_task.get("status") not in ("completed", "failed"):
+                    results.append({"scene_id": scene_id, "status": "skip", "reason": "已在队列中", "video_id": existing_video_id})
+                    continue
+                else:
+                    log_debug(f"分镜 {scene_id} 旧 video_id={existing_video_id} 不在活跃队列中，允许重新入队")
+                    scene["video_id"] = ""
+
+            log_step("生成分镜视频", "入队", f"scene_id={scene_id} | duration={duration}s (Agnes 异步)")
+            try:
+                fps = 24
+                num_frames = int(duration * fps)
+                remainder = (num_frames - 1) % 8
+                if remainder != 0:
+                    num_frames = num_frames + (8 - remainder)
+                if num_frames > 441:
+                    num_frames = 441
+                if num_frames < 9:
+                    num_frames = 9
+
+                task = add_to_queue(
+                    project_id=current_project_id,
+                    scene_id=scene_id,
+                    prompt=prompt_video,
+                    image_path=img_start,
+                    duration=duration,
+                    output_dir=paths["video"],
+                    num_frames=num_frames,
+                    fps=fps,
+                )
+                scene["video_id"] = task["task_id"]
+                results.append({"scene_id": scene_id, "status": "queued", "task_id": task["task_id"]})
+            except Exception as e:
+                log_error("生成分镜视频", str(e), f"scene_id={scene_id}")
+                results.append({"scene_id": scene_id, "status": "error", "error": str(e)})
+
+        write_json(paths["storyboard"], storyboard)
+        queued_count = sum(1 for r in results if r["status"] == "queued")
+        log_step("生成分镜视频", "入队完成", f"queued={queued_count}/{len(storyboard)}")
+        return jsonify({"success": True, "results": results, "storyboard": storyboard})
+
+    # ========== ComfyUI / 豆包 Seedance 模式：同步处理 ==========
     results = []
     for scene in storyboard:
         scene_id = scene.get("scene_id", "?")
@@ -624,20 +882,181 @@ def api_generate_storyboard_videos():
             results.append({"scene_id": scene_id, "status": "skip", "reason": "无视频提示词"})
             continue
 
-        log_step("生成分镜视频", "执行", f"scene_id={scene_id} | duration={duration}s | img={img_start}")
+        # 检查是否已有生成的视频
+        existing_video = scene.get("video", "")
+        if existing_video and os.path.exists(existing_video):
+            log_debug(f"分镜 {scene_id} 已有视频，跳过: {existing_video}")
+            results.append({"scene_id": scene_id, "status": "skipped", "reason": "已有视频"})
+            continue
+
+        log_step("生成分镜视频", "处理中", f"scene_id={scene_id} | duration={duration}s | engine={VIDEO_ENGINE}")
         try:
-            video_path = generate_video(img_start, prompt_video, duration, paths["video"], scene_id)
+            from video_generator import generate_video
+            video_path = generate_video(
+                image_path=img_start,
+                prompt=prompt_video,
+                duration=duration,
+                output_dir=paths["video"],
+                scene_id=scene_id,
+            )
             scene["video"] = video_path
-            results.append({"scene_id": scene_id, "status": "success", "video": video_path})
+            results.append({"scene_id": scene_id, "status": "completed", "path": video_path})
+            log_step("生成分镜视频", "完成", f"scene_id={scene_id} | path={video_path}")
         except Exception as e:
             log_error("生成分镜视频", str(e), f"scene_id={scene_id}")
             results.append({"scene_id": scene_id, "status": "error", "error": str(e)})
 
     write_json(paths["storyboard"], storyboard)
-    success_count = sum(1 for r in results if r["status"] == "success")
-    elapsed = time.time() - t0
-    log_step("生成分镜视频", "完成", f"成功={success_count}/{len(storyboard)} | elapsed={elapsed:.1f}s")
+    success_count = sum(1 for r in results if r["status"] == "completed")
+    log_step("生成分镜视频", "全部完成", f"success={success_count}/{len(storyboard)}")
     return jsonify({"success": True, "results": results, "storyboard": storyboard})
+
+
+@app.route("/api/video/queue", methods=["GET"])
+def api_video_queue():
+    """获取当前项目的视频生成队列状态"""
+    queue = get_queue(project_id=current_project_id)
+    log_debug(f"获取视频队列: {len(queue)} 个任务")
+    return jsonify({"success": True, "queue": queue})
+
+
+@app.route("/api/video/queue/<task_id>", methods=["DELETE"])
+def api_remove_video_task(task_id):
+    """从队列中移除任务"""
+    log_step("移除视频任务", "执行", f"task_id={task_id}")
+    from video_queue import remove_from_queue
+    remove_from_queue(task_id)
+    return jsonify({"success": True, "message": "任务已移除"})
+
+
+@app.route("/api/video/check/<task_id>", methods=["GET"])
+def api_check_video_task(task_id):
+    """手动检查单个视频任务状态（查询 Agnes API）"""
+    log_step("检查视频任务", "执行", f"task_id={task_id}")
+    from video_queue import get_task, _query_agnes_video_task, update_task, _update_storyboard_video
+
+    task = get_task(task_id)
+    if not task:
+        log_warn("检查视频任务", f"任务 {task_id} 不存在")
+        return jsonify({"success": False, "error": "任务不存在"}), 404
+
+    video_id = task.get("video_id", "")
+    if not video_id:
+        log_warn("检查视频任务", f"任务 {task_id} 尚未提交到 Agnes")
+        return jsonify({"success": False, "error": "任务尚未提交到 Agnes"}), 400
+
+    try:
+        result = _query_agnes_video_task(video_id)
+        api_status = result.get("status", "")
+        log_debug(f"检查视频任务: task_id={task_id} | Agnes status={api_status}")
+
+        if api_status == "completed":
+            video_url = result.get("remixed_from_video_id") or result.get("video_url", "")
+            if video_url:
+                from video_queue import _download_video
+                dest_path = os.path.join(task["output_dir"], f"scene_{task['scene_id']}.mp4")
+                local_path = _download_video(video_url, dest_path)
+                update_task(task_id, status="completed", video_url=video_url, local_path=local_path, completed_at=int(time.time()))
+                _update_storyboard_video(task["project_id"], task["scene_id"], local_path, video_id)
+                log_step("检查视频任务", "完成", f"task_id={task_id} | path={local_path}")
+                return jsonify({"success": True, "status": "completed", "local_path": local_path})
+            else:
+                log_warn("检查视频任务", f"任务 {task_id} 完成但未获取到视频 URL")
+                return jsonify({"success": True, "status": "completed", "warning": "未获取到视频 URL"})
+        elif api_status == "failed":
+            error_obj = result.get("error") or {}
+            error_msg = error_obj.get("message", "") if isinstance(error_obj, dict) else str(error_obj)
+            update_task(task_id, status="failed", error=error_msg)
+            log_error("检查视频任务", f"任务 {task_id} 失败", error_msg)
+            return jsonify({"success": True, "status": "failed", "error": error_msg})
+        elif api_status == "in_progress":
+            progress = result.get("progress", 0)
+            update_task(task_id, status="generating")
+            log_debug(f"视频生成中: task_id={task_id}, progress={progress}%")
+            return jsonify({"success": True, "status": "in_progress", "progress": progress})
+        elif api_status == "queued":
+            log_debug(f"视频排队中: task_id={task_id}")
+            return jsonify({"success": True, "status": "queued"})
+        else:
+            log_warn("检查视频任务", f"未知状态: task_id={task_id}, status={api_status}")
+            return jsonify({"success": True, "status": api_status or "unknown"})
+    except Exception as e:
+        log_error("检查视频任务", str(e), f"task_id={task_id}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/video/regenerate/<scene_id>", methods=["POST"])
+def api_regenerate_video(scene_id):
+    """重新生成单个分镜视频：清除旧任务和video_id，重新入队"""
+    log_step("视频重生成", "开始", f"scene_id={scene_id}")
+    paths = _require_paths()
+    if not paths:
+        return jsonify({"success": False, "error": "请先创建或选择项目"}), 400
+
+    storyboard = read_json(paths["storyboard"])
+    scene = None
+    scene_idx = -1
+    for idx, s in enumerate(storyboard):
+        if s.get("scene_id") == scene_id:
+            scene = s
+            scene_idx = idx
+            break
+
+    if not scene:
+        log_warn("视频重生成", f"分镜 {scene_id} 不存在")
+        return jsonify({"success": False, "error": f"分镜 {scene_id} 不存在"}), 404
+
+    img_start = scene.get("img_start", "")
+    prompt_video = scene.get("prompt_video", "")
+    duration = scene.get("duration", 10)
+
+    if not img_start or not os.path.exists(img_start):
+        log_warn("视频重生成", f"分镜 {scene_id} 无首帧图或文件不存在")
+        return jsonify({"success": False, "error": "该分镜无首帧图或文件不存在"}), 400
+    if not prompt_video:
+        log_warn("视频重生成", f"分镜 {scene_id} 无视频提示词")
+        return jsonify({"success": False, "error": "该分镜无视频提示词"}), 400
+
+    # 清除旧 video_id 和视频路径
+    old_video_id = scene.get("video_id", "")
+    if old_video_id:
+        from video_queue import remove_from_queue
+        remove_from_queue(old_video_id)
+        log_debug(f"移除旧视频任务: {old_video_id}")
+
+    scene["video_id"] = ""
+    scene["video"] = ""
+    write_json(paths["storyboard"], storyboard)
+
+    # 重新入队
+    try:
+        fps = 24
+        num_frames = int(duration * fps)
+        remainder = (num_frames - 1) % 8
+        if remainder != 0:
+            num_frames = num_frames + (8 - remainder)
+        if num_frames > 441:
+            num_frames = 441
+        if num_frames < 9:
+            num_frames = 9
+
+        task = add_to_queue(
+            project_id=current_project_id,
+            scene_id=scene_id,
+            prompt=prompt_video,
+            image_path=img_start,
+            duration=duration,
+            output_dir=paths["video"],
+            num_frames=num_frames,
+            fps=fps,
+        )
+        scene["video_id"] = task["task_id"]
+        write_json(paths["storyboard"], storyboard)
+        log_step("视频重生成", "入队", f"scene_id={scene_id} | task_id={task['task_id']}")
+        return jsonify({"success": True, "task_id": task["task_id"], "scene_id": scene_id})
+    except Exception as e:
+        log_error("视频重生成", str(e), f"scene_id={scene_id}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 # ============ 视频页面 API ============
@@ -661,6 +1080,52 @@ def api_video_list():
     return jsonify({"videos": videos, "total": len(videos)})
 
 
+@app.route("/api/video/export-jianying", methods=["POST"])
+def api_export_jianying():
+    """导出剪映草稿"""
+    paths = _require_paths()
+    if not paths:
+        return jsonify({"success": False, "error": "请先创建或选择项目"}), 400
+
+    storyboard = read_json(paths["storyboard"])
+    if not storyboard:
+        return jsonify({"success": False, "error": "暂无分镜数据，无法导出"}), 400
+
+    option = read_json(paths["option"], {"aspect_ratio": "16:9"})
+    aspect_ratio = option.get("aspect_ratio", "16:9")
+
+    # 获取项目名称
+    projects = load_projects_index()
+    project_name = current_project_id or "SOLO项目"
+    for p in projects:
+        if p["id"] == current_project_id:
+            project_name = p.get("name", current_project_id)
+            break
+
+    # 输出到项目目录下的 jianying_draft 文件夹
+    output_dir = os.path.join(paths["base"], "jianying_draft")
+    os.makedirs(output_dir, exist_ok=True)
+
+    log_step("导出剪映草稿", "开始", f"项目={project_name} | 分镜数={len(storyboard)}")
+    try:
+        draft_folder = create_jianying_draft(
+            project_name=project_name,
+            storyboard=storyboard,
+            output_dir=output_dir,
+            aspect_ratio=aspect_ratio
+        )
+        log_step("导出剪映草稿", "完成", f"路径={draft_folder}")
+        return jsonify({
+            "success": True,
+            "message": "剪映草稿导出成功",
+            "draft_folder": draft_folder,
+            "draft_name": project_name
+        })
+    except Exception as e:
+        log_error("导出剪映草稿", str(e))
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 # ============ 工具 API ============
 @app.route("/api/media-url")
 def api_media_url():
@@ -674,10 +1139,13 @@ def api_media_url():
 
     if os.path.commonpath([norm_abs, norm_base]) == norm_base:
         rel = os.path.relpath(norm_abs, norm_base).replace("\\", "/")
+        log_debug(f"media-url: {file_path} -> /{rel}")
         return jsonify({"success": True, "url": "/" + rel})
     else:
         # 路径不在项目目录内，尝试通过 file:// 协议
-        return jsonify({"success": True, "url": "file:///" + file_path.replace("\\", "/")})
+        url_path = file_path.replace("\\", "/")
+        log_debug(f"media-url: {file_path} -> file:///{url_path}")
+        return jsonify({"success": True, "url": "file:///" + url_path})
 
 
 @app.route("/api/open-file", methods=["POST"])
@@ -786,21 +1254,43 @@ def _save_config_to_file(settings):
     }
 
     import re
+    updated_keys = []
     for key, value in replacements.items():
+        if not value:  # 跳过空值
+            continue
+            
         # 转义 Windows 路径反斜杠
         escaped_value = value.replace("\\", "\\\\")
-        # 替换已存在的变量赋值
-        pattern = rf'^{key}\s*=\s*["\'].*["\']'
-        replacement = f'{key} = "{escaped_value}"'
-        content = re.sub(pattern, replacement, content, flags=re.MULTILINE)
+        
+        # 尝试替换已存在的变量赋值（支持双引号、单引号或无引号）
+        # 模式1: KEY = "value" 或 KEY = 'value'
+        pattern1 = rf'^{key}\s*=\s*["\'].*["\']'
+        # 模式2: KEY = value (无引号)
+        pattern2 = rf'^{key}\s*=\s*[^"\']+'
+        
+        new_line = f'{key} = "{escaped_value}"'
+        
+        if re.search(pattern1, content, flags=re.MULTILINE):
+            content = re.sub(pattern1, new_line, content, flags=re.MULTILINE)
+            updated_keys.append(key)
+        elif re.search(pattern2, content, flags=re.MULTILINE):
+            content = re.sub(pattern2, new_line, content, flags=re.MULTILINE)
+            updated_keys.append(key)
+        else:
+            # 配置项不存在，在文件末尾添加
+            content = content.rstrip() + f'\n{new_line}'
+            updated_keys.append(key)
+            log_debug(f"添加新配置项: {key}")
 
     write_file(config_path, content)
 
     # 热更新模块属性
-    for key, value in replacements.items():
+    for key in updated_keys:
+        value = replacements[key]
         setattr(app_config, key, value)
-
-    return True, "设置已保存"
+    
+    log_info(f"设置已保存: {len(updated_keys)} 个配置项")
+    return True, f"已保存 {len(updated_keys)} 个配置项"
 
 
 @app.route("/api/settings/load", methods=["GET"])
@@ -920,6 +1410,7 @@ def _next_character_id(characters):
 def api_character_library_list():
     """获取角色库列表"""
     characters = _load_character_library()
+    log_debug(f"获取角色库: {len(characters)} 个角色")
     return jsonify({"success": True, "characters": characters})
 
 
@@ -977,6 +1468,7 @@ def api_character_library_delete():
     if len(new_characters) == len(characters):
         return jsonify({"success": False, "error": f"角色 {char_id} 不存在"}), 404
 
+    log_step("删除角色库角色", "执行", f"char_id={char_id}")
     _save_character_library(new_characters)
 
     # 清理对应图片
@@ -1053,6 +1545,7 @@ def api_character_library_import_project():
             library.append(char)
             imported.append(char)
 
+    log_step("导入角色到库", "完成", f"导入={len(imported)} 个 | 总数={len(library)} 个")
     _save_character_library(library)
     return jsonify({"success": True, "imported": len(imported), "characters": library})
 
@@ -1096,6 +1589,7 @@ DEFAULT_DRAWING_STYLES = [
     {"en": "DreamWorks_Animation", "name": "梦工厂动漫风格", "desc": "梦工厂动画风格，角色个性鲜明，动态感强", "img": ""},
     {"en": "DC_Comics", "name": "DC动漫风格", "desc": "DC漫画风格，美式硬朗线条，暗色调超级英雄", "img": ""},
     {"en": "Mecha_Anime", "name": "机甲动漫风格", "desc": "日系机甲动漫风格，机械结构精密，战斗场景宏大", "img": ""},
+    {"en": "Minimalist_Black_White_Stick_Figure", "name": "极简黑白手绘火柴人插画", "desc": "极简黑白手绘风格，线条勾勒火柴人形象，幽默夸张动作，留白意境，手绘草图质感", "img": ""},
 ]
 
 
@@ -1145,8 +1639,10 @@ def api_drawing_style_list():
     """获取绘图风格列表"""
     engine = request.args.get("engine", "agnes")
     if engine not in ("agnes", "doubao", "comfyui"):
+        log_warn("获取绘图风格", f"不支持的引擎: {engine}")
         return jsonify({"success": False, "error": f"不支持的引擎: {engine}"}), 400
     styles = _get_engine_styles(engine)
+    log_debug(f"获取绘图风格: engine={engine} | 数量={len(styles)}")
     return jsonify({"success": True, "styles": styles})
 
 
@@ -1161,6 +1657,7 @@ def api_drawing_style_sync():
         _save_engine_styles(engine, updated)
         img_count = sum(1 for s in updated if s.get("img"))
         results[engine] = {"total": len(updated), "with_img": img_count}
+    log_step("同步绘图风格", "完成", str(results))
     return jsonify({"success": True, "results": results})
 
 
@@ -1173,9 +1670,13 @@ def api_drawing_style_generate():
     engine = (data.get("engine", "") or "").strip()
 
     if not style_en or not style_name:
+        log_warn("生成绘图风格", "参数不完整")
         return jsonify({"success": False, "error": "参数不完整"}), 400
     if engine not in ("doubao", "comfyui", "agnes", ""):
+        log_warn("生成绘图风格", f"不支持的引擎: {engine}")
         return jsonify({"success": False, "error": f"不支持的引擎: {engine}"}), 400
+
+    log_step("生成绘图风格", "开始", f"style={style_name} | engine={engine}")
 
     # 构造提示词
     prompt = DRAWING_PROMPT_TEMPLATE.replace("{style_name}", style_name)
@@ -1200,6 +1701,7 @@ def api_drawing_style_generate():
                 s["img"] = os.path.relpath(img_path, SOLO_DIR)
                 break
         _save_engine_styles(engine_key, styles)
+        log_step("生成绘图风格", "完成", f"style={style_name} | path={img_path}")
         return jsonify({"success": True, "img_path": img_path})
     except Exception as e:
         log_error("绘图风格生成", str(e))
@@ -1210,4 +1712,6 @@ def api_drawing_style_generate():
 if __name__ == "__main__":
     log_step("启动服务", "开始")
     log_info(f"访问地址: http://{FLASK_HOST}:{FLASK_PORT}")
+    # 启动视频生成队列工作线程
+    start_queue_worker()
     app.run(host=FLASK_HOST, port=FLASK_PORT, debug=FLASK_DEBUG)

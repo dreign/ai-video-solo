@@ -1,9 +1,19 @@
 {
-  "75": {
+  "269": {
     "inputs": {
-      "filename_prefix": "video/LTX_2.3_i2v",
+      "image": "z-image-turbo_00005_.png [output]"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "加载图像"
+    }
+  },
+  "331": {
+    "inputs": {
+      "filename_prefix": "video/ComfyUI",
       "format": "auto",
       "codec": "auto",
+      "video-preview": "",
       "video": [
         "320:310",
         0
@@ -12,45 +22,6 @@
     "class_type": "SaveVideo",
     "_meta": {
       "title": "保存视频"
-    }
-  },
-  "269": {
-    "inputs": {
-      "image": "scene_scene_06.png"
-    },
-    "class_type": "LoadImage",
-    "_meta": {
-      "title": "加载图像"
-    }
-  },
-  "324": {
-    "inputs": {
-      "offload_model": true,
-      "offload_cache": true,
-      "anything": [
-        "320:310",
-        0
-      ]
-    },
-    "class_type": "VRAMCleanup",
-    "_meta": {
-      "title": "🎈VRAM-Cleanup"
-    }
-  },
-  "325": {
-    "inputs": {
-      "clean_file_cache": true,
-      "clean_processes": true,
-      "clean_dlls": true,
-      "retry_times": 3,
-      "anything": [
-        "324",
-        0
-      ]
-    },
-    "class_type": "RAMCleanup",
-    "_meta": {
-      "title": "🎈RAM-Cleanup"
     }
   },
   "320:276": {
@@ -64,7 +35,7 @@
   },
   "320:277": {
     "inputs": {
-      "noise_seed": 962518664389268
+      "noise_seed": 132554896652217
     },
     "class_type": "RandomNoise",
     "_meta": {
@@ -98,27 +69,18 @@
   },
   "320:280": {
     "inputs": {
-      "sampler_name": "euler_cfg_pp"
+      "sampler_name": "euler"
     },
     "class_type": "KSamplerSelect",
     "_meta": {
       "title": "K采样器选择"
     }
   },
-  "320:281": {
-    "inputs": {
-      "sigmas": "0.85, 0.7250, 0.4219, 0.0"
-    },
-    "class_type": "ManualSigmas",
-    "_meta": {
-      "title": "自定义Sigmas"
-    }
-  },
   "320:282": {
     "inputs": {
       "cfg": 1,
       "model": [
-        "320:285",
+        "320:330",
         0
       ],
       "positive": [
@@ -185,7 +147,7 @@
   },
   "320:285": {
     "inputs": {
-      "lora_name": "ltx-2.3-22b-distilled-lora-384.safetensors",
+      "lora_name": "ltx_2.3_22b_distilled_1.1_lora_dynamic_fro09_avg_rank_111_bf16.safetensors",
       "strength_model": 0.5,
       "model": [
         "320:316",
@@ -268,32 +230,9 @@
       "title": "LTXV预处理"
     }
   },
-  "320:290": {
-    "inputs": {
-      "resize_type": "scale dimensions",
-      "resize_type.width": [
-        "320:312",
-        0
-      ],
-      "resize_type.height": [
-        "320:299",
-        0
-      ],
-      "resize_type.crop": "center",
-      "scale_method": "lanczos",
-      "input": [
-        "269",
-        0
-      ]
-    },
-    "class_type": "ResizeImageMaskNode",
-    "_meta": {
-      "title": "调整图像/掩码大小"
-    }
-  },
   "320:291": {
     "inputs": {
-      "sampler_name": "euler_ancestral_cfg_pp"
+      "sampler_name": "euler"
     },
     "class_type": "KSamplerSelect",
     "_meta": {
@@ -403,7 +342,7 @@
   },
   "320:299": {
     "inputs": {
-      "value": 720
+      "value": 1280
     },
     "class_type": "PrimitiveInt",
     "_meta": {
@@ -421,7 +360,7 @@
   },
   "320:301": {
     "inputs": {
-      "value": 16
+      "value": 10
     },
     "class_type": "PrimitiveInt",
     "_meta": {
@@ -435,42 +374,6 @@
     "class_type": "PrimitiveBoolean",
     "_meta": {
       "title": "Switch to Text to Video?"
-    }
-  },
-  "320:303": {
-    "inputs": {
-      "text": [
-        "320:319",
-        0
-      ],
-      "clip": [
-        "320:317",
-        0
-      ]
-    },
-    "class_type": "CLIPTextEncode",
-    "_meta": {
-      "title": "CLIP文本编码"
-    }
-  },
-  "320:304": {
-    "inputs": {
-      "frame_rate": [
-        "320:298",
-        0
-      ],
-      "positive": [
-        "320:303",
-        0
-      ],
-      "negative": [
-        "320:313",
-        0
-      ]
-    },
-    "class_type": "LTXVConditioning",
-    "_meta": {
-      "title": "LTXV条件"
     }
   },
   "320:305": {
@@ -561,6 +464,7 @@
         "320:298",
         0
       ],
+      "bit_depth": 8,
       "images": [
         "320:315",
         0
@@ -586,31 +490,18 @@
   },
   "320:312": {
     "inputs": {
-      "value": 1280
+      "value": 704
     },
     "class_type": "PrimitiveInt",
     "_meta": {
       "title": "Width"
     }
   },
-  "320:313": {
-    "inputs": {
-      "text": "modern elements, contemporary clothing, smartphones, cars, streetlights, neon signs, plastic, glass windows, western architecture, electric lights, headphones, watches, glasses, tattoos, piercings, makeup, digital screens, subtitles, text overlay, captions, title cards, on-screen text, music, background music, soundtrack, melodic audio, singing, humming, musical instruments (except guqin, xiao, flute as ambient), cartoon, anime, illustration style, low resolution, pixelated, blurry, distorted, deformed limbs, extra fingers, missing fingers, bad anatomy, bad proportions, duplicate limbs, mutated hands, fused fingers, long neck, ugly, tiling, poorly drawn, out of frame, disfigured, gross proportions, signature, watermark, logo, date stamp.",
-      "clip": [
-        "320:317",
-        0
-      ]
-    },
-    "class_type": "CLIPTextEncode",
-    "_meta": {
-      "title": "CLIP文本编码"
-    }
-  },
   "320:314": {
     "inputs": {
       "cfg": 1,
       "model": [
-        "320:285",
+        "320:330",
         0
       ],
       "positive": [
@@ -685,7 +576,7 @@
   },
   "320:319": {
     "inputs": {
-      "value": "16:9, cinematic hyper-realistic, 8K ultra HD, eye-level medium shot, slow zoom in, a dilapidated house in Shanyin, dim candlelight flickering, shadows on the walls, snow falling outside the paper window, warm dim amber light,\nLu You's complete image: an 85-year-old dying man, emaciated, skin like dried bark with deep age spots and wrinkles, sparse white hair spread on the pillow, sunken eyes filled with tears but still a glimmer of hope, wearing a faded white hemp undergarment, thin body under the quilt,\n0-3 sec: Lu You lies on the sickbed, breathing weakly, his withered hand tightly grabbing his son's hand, his son kneeling beside the bed weeping;\n4-12 sec: Lu You asks with great effort, voice trembling, speaking Chinese: \"中原……收复了吗？\", his son shakes his head in tears, Lu You's eyes dim, murmuring: \"我活了八十五年，等了一辈子……等不到了。\";\n13-20 sec: he suddenly coughs violently, chest heaving, then with his last strength, eyes brightening, he cries out in a hoarse voice, speaking Chinese: \"死去元知万事空，但悲不见九州同！\", the image freezes,\nstable face without distortion, natural movements, no flickering, sound effects of crackling candle and wind outside, no background music, no subtitles."
+      "value": ""
     },
     "class_type": "PrimitiveStringMultiline",
     "_meta": {
@@ -707,6 +598,198 @@
     "class_type": "ComfyMathExpression",
     "_meta": {
       "title": "Math Expression (length)"
+    }
+  },
+  "320:324": {
+    "inputs": {
+      "lora_name": "gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors",
+      "strength_model": 1,
+      "strength_clip": 1,
+      "model": [
+        "320:330",
+        0
+      ],
+      "clip": [
+        "320:317",
+        0
+      ]
+    },
+    "class_type": "LoraLoader",
+    "_meta": {
+      "title": "加载LoRA"
+    }
+  },
+  "320:325": {
+    "inputs": {
+      "prompt": [
+        "320:319",
+        0
+      ],
+      "max_length": 2048,
+      "sampling_mode": "on",
+      "sampling_mode.temperature": 0.7,
+      "sampling_mode.top_k": 64,
+      "sampling_mode.top_p": 0.95,
+      "sampling_mode.min_p": 0.05,
+      "sampling_mode.repetition_penalty": 1.05,
+      "sampling_mode.seed": 0,
+      "sampling_mode.presence_penalty": 0,
+      "thinking": false,
+      "use_default_template": true,
+      "clip": [
+        "320:324",
+        1
+      ]
+    },
+    "class_type": "TextGenerateLTX2Prompt",
+    "_meta": {
+      "title": "TextGenerateLTX2Prompt"
+    }
+  },
+  "320:326": {
+    "inputs": {
+      "source": [
+        "320:327",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "预览任意"
+    }
+  },
+  "320:327": {
+    "inputs": {
+      "switch": [
+        "320:328",
+        0
+      ],
+      "on_false": [
+        "320:319",
+        0
+      ],
+      "on_true": [
+        "320:325",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "切换"
+    }
+  },
+  "320:328": {
+    "inputs": {
+      "value": true
+    },
+    "class_type": "PrimitiveBoolean",
+    "_meta": {
+      "title": "Boolean (Enable Prompt Enhance)"
+    }
+  },
+  "320:281": {
+    "inputs": {
+      "sigmas": "0.85, 0.0"
+    },
+    "class_type": "ManualSigmas",
+    "_meta": {
+      "title": "自定义Sigmas"
+    }
+  },
+  "320:303": {
+    "inputs": {
+      "text": [
+        "320:327",
+        0
+      ],
+      "clip": [
+        "320:317",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP文本编码"
+    }
+  },
+  "320:290": {
+    "inputs": {
+      "resize_type": "scale dimensions",
+      "resize_type.width": [
+        "320:312",
+        0
+      ],
+      "resize_type.height": [
+        "320:299",
+        0
+      ],
+      "resize_type.crop": "center",
+      "scale_method": "lanczos",
+      "input": [
+        "269",
+        0
+      ]
+    },
+    "class_type": "ResizeImageMaskNode",
+    "_meta": {
+      "title": "调整图像/掩码大小"
+    }
+  },
+  "320:304": {
+    "inputs": {
+      "frame_rate": [
+        "320:298",
+        0
+      ],
+      "positive": [
+        "320:303",
+        0
+      ],
+      "negative": [
+        "320:313",
+        0
+      ]
+    },
+    "class_type": "LTXVConditioning",
+    "_meta": {
+      "title": "LTXV条件"
+    }
+  },
+  "320:330": {
+    "inputs": {
+      "nag_scale": 11,
+      "nag_alpha": 0.25,
+      "nag_tau": 2.5,
+      "inplace": true,
+      "model": [
+        "320:285",
+        0
+      ],
+      "nag_cond_video": [
+        "320:313",
+        0
+      ],
+      "nag_cond_audio": [
+        "320:313",
+        0
+      ]
+    },
+    "class_type": "LTX2_NAG",
+    "_meta": {
+      "title": "LTX2 NAG"
+    }
+  },
+  "320:313": {
+    "inputs": {
+      "text": "subtitles, text, watermark, overlay text, lower thirds, blurry, oversaturated, pixelated, low resolution, grainy, distorted, noise, compression artifacts, jpeg artifacts, glitches, watermark, text, logo, signature, copyright, distorted sound, saturated sound, loud",
+      "clip": [
+        "320:317",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP文本编码"
     }
   }
 }

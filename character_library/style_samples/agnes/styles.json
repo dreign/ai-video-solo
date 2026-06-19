@@ -190,5 +190,11 @@
     "name": "机甲动漫风格",
     "desc": "日系机甲动漫风格，机械结构精密，战斗场景宏大",
     "img": "character_library\\style_samples\\agnes\\Mecha_Anime\\scene_sample.png"
+  },
+  {
+    "en": "Minimalist_Black_White_Stick_Figure",
+    "name": "极简黑白手绘火柴人插画",
+    "desc": "极简黑白手绘风格，线条勾勒火柴人形象，幽默夸张动作，留白意境，手绘草图质感",
+    "img": "character_library\\style_samples\\agnes\\Minimalist_Black_White_Stick_Figure\\scene_sample.png"
   }
 ]
