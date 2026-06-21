@@ -1266,13 +1266,18 @@ document.getElementById("btnGenerateImgPrompts").addEventListener("click", async
 
 document.getElementById("btnGenerateImgs").addEventListener("click", async () => {
     showStatus("imageGenStatus", "正在生成首帧图，请稍候...", "loading");
-    const result = await apiFetch("/api/storyboard/generate-images", { method: "POST" });
-    if (result.success) {
-        result.storyboard = await convertStoryboardMediaUrls(result.storyboard);
-        renderImageGenList(result.storyboard);
-        showStatus("imageGenStatus", "首帧图生成完成", "success");
-    } else {
-        showStatus("imageGenStatus", result.error || "生成失败", "error");
+    try {
+        const result = await apiFetch("/api/storyboard/generate-images", { method: "POST" });
+        if (result.success) {
+            result.storyboard = await convertStoryboardMediaUrls(result.storyboard);
+            renderImageGenList(result.storyboard);
+            showStatus("imageGenStatus", "首帧图生成完成", "success");
+        } else {
+            showStatus("imageGenStatus", result.error || "生成失败", "error");
+        }
+    } catch (e) {
+        console.error("生成首帧图失败:", e);
+        showStatus("imageGenStatus", "生成失败: " + e.message, "error");
     }
 });
 

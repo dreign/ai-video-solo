@@ -61,6 +61,12 @@ def generate_image_by_engine(prompt: str, aspect_ratio: str, output_dir: str, sc
 app = Flask(__name__, static_folder=".", static_url_path="")
 CORS(app)
 
+@app.errorhandler(Exception)
+def handle_exception(e):
+    import traceback
+    log_error("全局异常", f"未处理的异常: {str(e)}\n{traceback.format_exc()}", "")
+    return jsonify({"success": False, "error": str(e)}), 500
+
 # ============ 项目路径管理 ============
 current_project_id = None  # 当前活跃项目ID
 
@@ -123,7 +129,7 @@ def read_json(path, default=None):
     if default is None:
         default = []
     if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8-sig") as f:
             return json.load(f)
     return default
 
@@ -660,67 +666,75 @@ def api_generate_img_prompts():
 @app.route("/api/storyboard/generate-images", methods=["POST"])
 def api_generate_storyboard_images():
     t0 = time.time()
-    paths = _require_paths()
-    if not paths:
-        return jsonify({"success": False, "error": "请先创建或选择项目"}), 400
+    try:
+        paths = _require_paths()
+        if not paths:
+            return jsonify({"success": False, "error": "请先创建或选择项目"}), 400
 
-    storyboard = read_json(paths["storyboard"])
-    characters = read_json(paths["character"])
-    option = read_json(paths["option"], {"aspect_ratio": "16:9", "art_style": "电影级超写实"})
+        storyboard = read_json(paths["storyboard"])
+        characters = read_json(paths["character"])
+        option = read_json(paths["option"], {"aspect_ratio": "16:9", "art_style": "电影级超写实"})
 
-    log_step("生成分镜首帧图", "开始", f"分镜数={len(storyboard)} | 角色数={len(characters)} | 风格={option.get('art_style', '电影级超写实')}")
+        log_step("生成分镜首帧图", "开始", f"分镜数={len(storyboard)} | 角色数={len(characters)} | 风格={option.get('art_style', '电影级超写实')}")
 
-    if not storyboard:
-        log_warn("生成分镜首帧图", "分镜为空")
-        return jsonify({"success": False, "error": "请先生成分镜脚本"}), 400
+        if not storyboard:
+            log_warn("生成分镜首帧图", "分镜为空")
+            return jsonify({"success": False, "error": "请先生成分镜脚本"}), 400
 
-    os.makedirs(paths["storyboard_img"], exist_ok=True)
+        os.makedirs(paths["storyboard_img"], exist_ok=True)
 
-    # 构建角色名称到图片路径的映射
-    char_img_map = {}
-    for char in characters:
-        if char.get("name_en") and char.get("img"):
-            char_img_map[char["name_en"]] = char["img"]
-    log_debug(f"角色图片映射: {list(char_img_map.keys())}")
+        char_img_map = {}
+        for char in characters:
+            if char.get("name_en") and char.get("img"):
+                char_img_map[char["name_en"]] = char["img"]
 
-    results = []
-    for scene in storyboard:
-        scene_id = scene.get("scene_id", "?")
-        prompt_img = scene.get("prompt_img_start", "")
+        results = []
+        for scene in storyboard:
+            scene_id = scene.get("scene_id", "?")
+            prompt_img = scene.get("prompt_img_start", "")
 
-        if not prompt_img:
-            log_warn("生成分镜首帧图", f"分镜 {scene_id} 无首帧图提示词，跳过")
-            results.append({"scene_id": scene_id, "status": "skip", "reason": "无首帧图提示词"})
-            continue
+            if not prompt_img:
+                results.append({"scene_id": scene_id, "status": "skip", "reason": "无首帧图提示词"})
+                continue
 
-        # 查找关联角色图
-        reference_img = None
-        name_list = scene.get("name_en_list", [])
-        for name_en in name_list:
-            if name_en in char_img_map:
-                reference_img = char_img_map[name_en]
-                break
-        log_step("生成分镜首帧图", "执行", f"scene_id={scene_id} | 关联角色={name_list} | 参考图={reference_img or '无'}")
+            existing_img = scene.get("img_start", "")
+            if existing_img and os.path.exists(existing_img):
+                results.append({"scene_id": scene_id, "status": "skip", "reason": "首帧图已生成"})
+                continue
 
-        try:
-            img_path = generate_image_by_engine(
-                prompt=prompt_img,
-                aspect_ratio=option.get("aspect_ratio", "16:9"),
-                output_dir=paths["storyboard_img"],
-                scene_id=scene_id,
-                reference_image_path=reference_img,
-            )
-            scene["img_start"] = img_path
-            results.append({"scene_id": scene_id, "status": "success", "img": img_path})
-        except Exception as e:
-            log_error("生成分镜首帧图", str(e), f"scene_id={scene_id}")
-            results.append({"scene_id": scene_id, "status": "error", "error": str(e)})
+            reference_img = None
+            name_list = scene.get("name_en_list", [])
+            for name_en in name_list:
+                if name_en in char_img_map:
+                    reference_img = char_img_map[name_en]
+                    break
 
-    write_json(paths["storyboard"], storyboard)
-    success_count = sum(1 for r in results if r["status"] == "success")
-    elapsed = time.time() - t0
-    log_step("生成分镜首帧图", "完成", f"成功={success_count}/{len(storyboard)} | elapsed={elapsed:.1f}s")
-    return jsonify({"success": True, "results": results, "storyboard": storyboard})
+            log_step("生成分镜首帧图", "执行", f"scene_id={scene_id} | 关联角色={name_list} | 参考图={reference_img or '无'}")
+
+            try:
+                img_path = generate_image_by_engine(
+                    prompt=prompt_img,
+                    aspect_ratio=option.get("aspect_ratio", "16:9"),
+                    output_dir=paths["storyboard_img"],
+                    scene_id=scene_id,
+                    reference_image_path=reference_img,
+                )
+                scene["img_start"] = img_path
+                results.append({"scene_id": scene_id, "status": "success", "img": img_path})
+            except Exception as e:
+                log_error("生成分镜首帧图", str(e), f"scene_id={scene_id}")
+                results.append({"scene_id": scene_id, "status": "error", "error": str(e)})
+
+        write_json(paths["storyboard"], storyboard)
+        success_count = sum(1 for r in results if r["status"] == "success")
+        elapsed = time.time() - t0
+        log_step("生成分镜首帧图", "完成", f"成功={success_count}/{len(storyboard)} | elapsed={elapsed:.1f}s")
+        return jsonify({"success": True, "results": results, "storyboard": storyboard})
+    
+    except Exception as e:
+        import traceback
+        log_error("生成分镜首帧图", f"全局异常: {str(e)}\n{traceback.format_exc()}", "")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route("/api/storyboard/generate-image/<scene_id>", methods=["POST"])
